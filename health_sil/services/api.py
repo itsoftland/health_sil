@@ -25,3 +25,15 @@ def reset_doctor_token(doctor):
         frappe.log_error(f"Error resetting doctor token: {e}")
         return {"error": "Error resetting doctor token"}
 
+@frappe.whitelist(allow_guest=False)
+def get_login_redirect_url():
+    """
+    Returns the appropriate redirect URL based on the user's roles.
+    If the user has the 'Dashboard_user' role, redirect to daily-report.
+    Otherwise, redirect to the home page.
+    """
+    roles = frappe.get_roles(frappe.session.user)
+    if "Dashboard_user" in roles:
+        return "/app/daily-report"
+    return "/app/home"
+

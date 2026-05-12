@@ -288,41 +288,15 @@
                 }),
                 success: function(response) {
                     if (response.message === 'Logged In') {
-                        // Fetch roles to determine landing page
+                        // Fetch the redirect URL based on user role
                         $.ajax({
                             type: 'GET',
-                            url: '/api/method/frappe.client.get_value',
-                            data: {
-                                doctype: 'User',
-                                filters: JSON.stringify({ name: frappe.session ? frappe.session.user : username }),
-                                fieldname: JSON.stringify(['name'])
-                            },
-                            success: function() {
-                                // Get roles of the logged-in user
-                                frappe.call({
-                                    method: 'frappe.client.get_list',
-                                    args: {
-                                        doctype: 'Has Role',
-                                        filters: { parent: username },
-                                        fields: ['role'],
-                                        limit: 50
-                                    },
-                                    callback: function(r) {
-                                        const roles = (r.message || []).map(function(d) { return d.role; });
-                                        const dashboardRoles = ['Reception', 'System Manager'];
-                                        const hasDashboardRole = roles.some(function(role) {
-                                            return dashboardRoles.indexOf(role) !== -1;
-                                        });
-                                        window.location.href = hasDashboardRole ? 'app/daily-report' : 'app/home';
-                                    },
-                                    error: function() {
-                                        // Fallback to home if role fetch fails
-                                        window.location.href = 'app/home';
-                                    }
-                                });
+                            url: '/api/method/health_sil.services.api.get_login_redirect_url',
+                            success: function(res) {
+                                window.location.href = res.message || '/app';
                             },
                             error: function() {
-                                window.location.href = 'app/home';
+                                window.location.href = '/app'; // Fallback to home
                             }
                         });
                     } else {

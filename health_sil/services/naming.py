@@ -36,7 +36,8 @@ def generate_custom_uid(doc, method):
             frappe.log_error(f"Failed to set patient uid: {e}")
             return
 
-        # Compose UID
+        # Compose UID and set as primary key
         uid = f"DR-PID{year_suffix}-{current}"
         doc.uid = uid
+        doc.name = uid  # Makes the PID the Frappe document ID (primary key)
 
