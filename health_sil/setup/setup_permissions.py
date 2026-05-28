@@ -1,47 +1,60 @@
 import frappe
 
-# Minimum read-only permissions needed by custom roles for backend API operations.
-# These permissions allow internal ERPNext functions (e.g. set_missing_values,
-# _get_party_details) to pass permission checks when billing APIs are called
-# by restricted users. These do NOT grant create/write/submit access — the
-# actual document operations use ignore_permissions in the API code.
+# Minimum permissions needed by custom roles for backend API operations.
+# These permissions allow internal ERPNext functions (set_missing_values,
+# _get_party_details, Serial and Batch Bundle creation) to pass permission
+# checks when billing APIs are called by restricted users.
 #
-# The users will NOT see these doctypes in the sidebar because they don't
-# have access to the corresponding modules (Accounts, Stock, Selling, etc.).
+# What's NOT included here and why:
+#   - Stock Ledger Entry / GL Entry create perms: ERPNext sets
+#     flags.ignore_permissions internally in stock_ledger.make_entry and
+#     general_ledger.make_entry, so user perms are not needed.
+#   - Payment Entry submit perms: The API sets
+#     doc.flags.ignore_permissions = True on the Payment Entry doc itself,
+#     which is sufficient.
+#
+# What IS included and why:
+#   - Serial and Batch Bundle: ERPNext's make_serial_and_batch_bundle
+#     does doc.save() and doc.submit() WITHOUT setting ignore_permissions,
+#     so the calling user needs perms on this doctype.
+#   - Read-only on lookup tables (Customer, Item, Account, etc.): needed
+#     for invoice validation and party detail lookups.
 
-# Common billing permissions shared by pharmacy/reception roles
 _BILLING_PERMISSIONS = [
-    # set_missing_values → _get_party_details → frappe.has_permission("Customer", "read")
+    # Read-only lookups required during Sales Invoice / Payment Entry validation
     {"doctype": "Customer", "permlevel": 0, "read": 1},
-    # Invoice item lookups
     {"doctype": "Item", "permlevel": 0, "read": 1},
-    # Payment account lookups
     {"doctype": "Account", "permlevel": 0, "read": 1},
-    # Tax template resolution
     {"doctype": "Sales Taxes and Charges Template", "permlevel": 0, "read": 1},
-    # on_submit → make_bundle_using_old_serial_batch_fields → creates Serial and Batch Bundle
-    {"doctype": "Serial and Batch Bundle", "permlevel": 0, "read": 1, "write": 1, "create": 1},
-    # Payment entry creation
-    {"doctype": "Payment Entry", "permlevel": 0, "read": 1, "write": 1, "create": 1, "submit": 1},
-    # Stock posting during update_stock=1 invoices
-    {"doctype": "Stock Ledger Entry", "permlevel": 0, "read": 1, "write": 1, "create": 1},
-    # Accounting ledger postings
-    {"doctype": "GL Entry", "permlevel": 0, "read": 1, "write": 1, "create": 1},
-    # Mode of payment validation
     {"doctype": "Mode of Payment", "permlevel": 0, "read": 1},
-    # Warehouse lookup for batch items
     {"doctype": "Warehouse", "permlevel": 0, "read": 1},
-    # Price list lookups
     {"doctype": "Price List", "permlevel": 0, "read": 1},
     {"doctype": "Item Price", "permlevel": 0, "read": 1},
+
+    # Required write/create/submit — ERPNext does NOT auto-bypass perms here.
+    # Triggered by Sales Invoice on_submit when update_stock=1 + batch_no.
+    {"doctype": "Serial and Batch Bundle", "permlevel": 0, "read": 1, "write": 1, "create": 1, "submit": 1},
 ]
 
 ROLE_PERMISSIONS = {
+    # All known casings of the pharmacy role are listed because different
+    # deployments have used different names. setup_custom_role_permissions()
+    # checks role existence and skips any that don't exist on the site, so
+    # listing extras is safe.
     "pharmacy": _BILLING_PERMISSIONS,
+    "Pharmacy": _BILLING_PERMISSIONS,
     "Pharmacy Staff": _BILLING_PERMISSIONS,
+    "reception": _BILLING_PERMISSIONS,
+    "Reception": _BILLING_PERMISSIONS,
     "Reception Staff": _BILLING_PERMISSIONS,
     "Laboratory Staff": [
-        # Needed by lab_test.insert — Lab Test permission for creation
+        # lab_test.insert() in laboratory_bill.create_lab_tests_for_bill
+        {"doctype": "Lab Test", "permlevel": 0, "read": 1, "write": 1, "create": 1},
+    ],
+    "laboratory": [
+        {"doctype": "Lab Test", "permlevel": 0, "read": 1, "write": 1, "create": 1},
+    ],
+    "Laboratory": [
         {"doctype": "Lab Test", "permlevel": 0, "read": 1, "write": 1, "create": 1},
     ],
 }
@@ -49,12 +62,11 @@ ROLE_PERMISSIONS = {
 
 def setup_custom_role_permissions():
     """
-    Add minimum read-only permissions for custom roles on core ERPNext doctypes.
-    This is idempotent — safe to run multiple times (skips if permission already exists).
-    Called from after_migrate hook to ensure permissions survive bench updates.
+    Add minimum permissions for custom roles on core ERPNext doctypes.
+    Idempotent — safe to run multiple times. Called from after_install and
+    after_migrate hooks so permissions survive bench updates.
     """
     for role, permissions in ROLE_PERMISSIONS.items():
-        # Skip if role doesn't exist
         if not frappe.db.exists("Role", role):
             continue
 
@@ -62,25 +74,20 @@ def setup_custom_role_permissions():
             doctype = perm["doctype"]
             permlevel = perm.get("permlevel", 0)
 
-            # Check if this role already has ANY permission on this doctype
             existing = frappe.db.exists("DocPerm", {
                 "parent": doctype,
                 "role": role,
-                "permlevel": permlevel
+                "permlevel": permlevel,
             })
-
             if not existing:
-                # Also check Custom DocPerm
                 existing = frappe.db.exists("Custom DocPerm", {
                     "parent": doctype,
                     "role": role,
-                    "permlevel": permlevel
+                    "permlevel": permlevel,
                 })
-
             if existing:
                 continue
 
-            # Add the permission via Custom DocPerm so it doesn't modify core DocType json
             custom_perm = frappe.new_doc("Custom DocPerm")
             custom_perm.parent = doctype
             custom_perm.parenttype = "DocType"
@@ -97,7 +104,7 @@ def setup_custom_role_permissions():
             custom_perm.insert(ignore_permissions=True)
 
             frappe.logger().info(
-                f"[health_sil] Added {role} read permission on {doctype}"
+                f"[health_sil] Added {role} permission on {doctype}"
             )
 
     frappe.db.commit()

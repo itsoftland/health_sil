@@ -9,27 +9,26 @@ from frappe.utils import nowdate, flt
 def create_sales_invoice(patient, patient_name, doctor=None, items=None, mode_of_payment=None, price_list=None, discount_amount_cash=None, discount_amount_percentage=None):
     """
     Creates a Sales Invoice and auto-generates Payment Entry.
-    Runs under Administrator context to bypass all nested ERPNext permission
-    checks (Serial Batch Bundle, Stock Ledger, GL Entry, etc.) that occur
-    deep inside on_submit hooks. The @frappe.whitelist decorator already
-    ensures only authenticated desk users can call this API.
+    Switches to Administrator for doc operations, then patches ownership
+    back to the actual user so the audit trail is preserved.
     """
     original_user = frappe.session.user
     try:
         customer = get_validated_customer(patient_name)
 
-        # Switch to Administrator for backend doc operations
+        # Switch to Administrator to bypass all nested ERPNext permission checks
         frappe.set_user("Administrator")
 
-        # Create and process Sales Invoice
-        invoice = create_and_submit_invoice(customer, patient, patient_name, doctor, items, price_list, discount_amount_cash, discount_amount_percentage)
-        # Process payment if required
-        process_payment(invoice, mode_of_payment) if mode_of_payment else None
-
+        invoice = create_and_submit_invoice(
+            customer, patient, patient_name, doctor, items,
+            price_list, discount_amount_cash, discount_amount_percentage,
+            original_user,
+        )
+        process_payment(invoice, mode_of_payment, original_user) if mode_of_payment else None
         return invoice
 
     except Exception as e:
-        handle_errors(e)
+        handle_errors(e, original_user)
     finally:
         frappe.set_user(original_user)
 
@@ -40,25 +39,25 @@ def create_sales_invoice(patient, patient_name, doctor=None, items=None, mode_of
 def get_validated_customer(patient_name):
     """Get and validate customer"""
     customer = frappe.get_cached_value("Patient", patient_name, "customer")
-    
+
     if not customer:
         frappe.throw(_("No Customer linked to Patient {0}").format(patient_name))
-    
+
     if frappe.get_cached_value("Customer", customer, "disabled"):
         frappe.throw(_("Customer {0} is disabled").format(customer))
-    
+
     return customer
 
-def create_and_submit_invoice(customer, patient, patient_name, doctor, items, price_list, discount_amount_cash, discount_amount_percentage):
+
+def create_and_submit_invoice(customer, patient, patient_name, doctor, items, price_list, discount_amount_cash, discount_amount_percentage, original_user):
     items = json.loads(items)
     invoice = frappe.new_doc("Sales Invoice")
-    
+
     prepared_items = [validate_and_prepare_item(row) for row in items]
     contains_medications = any(
         frappe.get_cached_value("Item", row["item_code"], "item_group") == "Medications"
         for row in prepared_items
     )
-    
 
     invoice.update({
         "customer": customer,
@@ -70,14 +69,22 @@ def create_and_submit_invoice(customer, patient, patient_name, doctor, items, pr
         "update_stock": 1 if contains_medications else 0,
         "items": prepared_items,
         "taxes_and_charges": frappe.db.get_value("Sales Taxes and Charges Template", {"is_default": 1}, "name"),
-        "discount_amount" : flt(discount_amount_cash or 0),
-        "additional_discount_percentage" : flt(discount_amount_percentage or 0),
+        "discount_amount": flt(discount_amount_cash or 0),
+        "additional_discount_percentage": flt(discount_amount_percentage or 0),
     })
 
     invoice.set_missing_values()
     invoice.insert(ignore_permissions=True)
     invoice.submit()
+
+    # Patch ownership back to the actual user
+    frappe.db.set_value("Sales Invoice", invoice.name, {
+        "owner": original_user,
+        "modified_by": original_user
+    }, update_modified=False)
+
     return invoice
+
 
 def validate_and_prepare_item(item):
     """Validate individual item and prepare for insertion"""
@@ -102,11 +109,12 @@ def validate_and_prepare_item(item):
     return {
         "item_code": item_code,
         "qty": qty,
-        "uom": "Nos",        # billing qty is always in NOS; ERPNext applies conversion to stock_uom
+        "uom": "Nos",
         "rate": rate,
         "batch_no": batch_no if item_group == "Medications" else "",
-        "warehouse": warehouse if item_group == "Medications" else None
+        "warehouse": warehouse if item_group == "Medications" else None,
     }
+
 
 def get_warehouse_for_batch(item_code, batch_no):
     """Get the warehouse holding the given batch of an item"""
@@ -124,39 +132,47 @@ def get_warehouse_for_batch(item_code, batch_no):
         LIMIT 1
     """, (item_code, batch_no), as_dict=True)
 
-
-    if  result:
+    if result:
         return result[0]["warehouse"]
     else:
         frappe.throw(_("No warehouse found with stock for item {0} and batch {1}").format(item_code, batch_no))
 
 
-def process_payment(invoice, mode_of_payment):
+def process_payment(invoice, mode_of_payment, original_user=None):
     """Handle payment processing"""
     try:
         validate_mode_of_payment(mode_of_payment, invoice.company)
-        return create_payment_entry(invoice, mode_of_payment)
+        return create_payment_entry(invoice, mode_of_payment, original_user)
     except Exception as e:
         log_and_notify_payment_error(invoice.name, e)
         return None
-    
+
+
 def validate_mode_of_payment(mode, company):
     """Validate mode of payment configuration"""
     if not frappe.db.exists("Mode of Payment", {"name": mode}):
         frappe.throw(_("Invalid Mode of Payment: {0}").format(mode))
-    
-    if not frappe.get_cached_value("Mode of Payment Account", 
+
+    if not frappe.get_cached_value("Mode of Payment Account",
         {"parent": mode, "company": company}, "default_account"):
         frappe.throw(_("Mode of Payment {0} not configured for company {1}").format(mode, company))
+
 
 def log_and_notify_payment_error(invoice_name, error):
     """Centralized error handling for payments"""
     frappe.log_error(
         title=_("Payment Processing Failed"),
-        message=f"Invoice: {invoice_name}\nError: {str(error)}\n\nTraceback:\n{traceback.format_exc()}"
+        message=(
+            f"User: {frappe.session.user}\n"
+            f"Roles: {', '.join(frappe.get_roles())}\n"
+            f"Invoice: {invoice_name}\n"
+            f"Error: {str(error)}\n\n"
+            f"Traceback:\n{traceback.format_exc()}"
+        ),
     )
 
-def create_payment_entry(invoice, mode_of_payment):
+
+def create_payment_entry(invoice, mode_of_payment, original_user=None):
     """Create payment entry using existing invoice doc"""
     if invoice.outstanding_amount <= 0:
         return None
@@ -175,29 +191,39 @@ def create_payment_entry(invoice, mode_of_payment):
         "references": [{
             "reference_doctype": "Sales Invoice",
             "reference_name": invoice.name,
-            "allocated_amount": invoice.outstanding_amount
-        }]
+            "allocated_amount": invoice.outstanding_amount,
+        }],
     })
 
     pe.insert(ignore_permissions=True)
     pe.submit()
+
+    # Patch ownership back to the actual user
+    if original_user:
+        frappe.db.set_value("Payment Entry", pe.name, {
+            "owner": original_user,
+            "modified_by": original_user
+        }, update_modified=False)
+
     return pe
+
 
 def get_payment_account(mode, company):
     """Cached lookup for payment account"""
-    return frappe.get_cached_value("Mode of Payment Account", 
+    return frappe.get_cached_value("Mode of Payment Account",
         {"parent": mode, "company": company}, "default_account")
 
-def handle_errors(error):
-    """Global error handler"""
-    tb = traceback.format_exc()
+
+def handle_errors(error, original_user=None):
+    """Global error handler — full traceback to logs, generic message to user."""
+    user = original_user or frappe.session.user
     frappe.log_error(
         title=_("Pharmacy Billing Error"),
         message=(
-            f"User: {frappe.session.user}\n"
-            f"Roles: {', '.join(frappe.get_roles())}\n"
+            f"User: {user}\n"
+            f"Roles: {', '.join(frappe.get_roles(user))}\n"
             f"Error: {str(error)}\n\n"
-            f"Full Traceback:\n{tb}"
-        )
+            f"Traceback:\n{traceback.format_exc()}"
+        ),
     )
-    frappe.throw(_("Billing failed: {0}").format(str(error)))
+    frappe.throw(_("Process failed. Please check error logs for details."))
