@@ -9,7 +9,8 @@ from frappe import json
 @frappe.whitelist()
 def create_registration_only(patient, patient_name, items=None, mode_of_payment=None):
     """
-    Creates a Sales Invoice for a Patient with optimizations and auto-generates Payment Entry
+    Creates a Sales Invoice for a Patient with optimizations and auto-generates Payment Entry.
+    Runs under Administrator context for backend doc operations.
     """
     if frappe.db.get_value("Patient", patient, "custom_is_registered"):
         frappe.throw("Patient already registered")
@@ -21,30 +22,27 @@ def create_registration_only(patient, patient_name, items=None, mode_of_payment=
     if not registration_items:
         frappe.throw("Registration must include Registration Fee item")
 
+    original_user = frappe.session.user
     try:
-        # Validate inputs f
+        # Validate inputs (as original user)
         validate_mandatory(patient, items)
-        
-        # Convert items to list if string
         items = safe_json_parse(items)
-        
-        # Batch validate items before processing
         validate_items_existence(items)
-        
-        # Get customer with validation
         customer = get_validated_customer(patient)
+
+        # Switch to Administrator for doc operations
+        frappe.set_user("Administrator")
+
         update_patient_registration_details(patient)
-        
-        # Create and process Sales Invoice
         invoice = create_and_submit_invoice_only(patient, patient_name, customer, items)
-        
-        # Process payment if required
         payment_entry = process_payment(invoice, mode_of_payment) if mode_of_payment else None
         
         return build_response(invoice)
 
     except Exception as e:
         handle_errors(e)
+    finally:
+        frappe.set_user(original_user)
 
 # ----------
 # Helper Functions
@@ -69,7 +67,7 @@ def safe_json_parse(items):
 def validate_items_existence(items):
     """Batch validate items in single query"""
     item_codes = {item.get("item_code") for item in items}
-    existing_items = {d.name for d in frappe.get_all("Item", filters={"name": ["in", item_codes]}, fields=["name"])}
+    existing_items = {d.name for d in frappe.get_all("Item", filters={"name": ["in", item_codes]}, fields=["name"], ignore_permissions=True)}
     
     if missing := item_codes - existing_items:
         frappe.throw(_("Invalid items: {0}").format(", ".join(missing)))

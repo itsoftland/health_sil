@@ -31,6 +31,7 @@ def manage_token(practitioner_name):
             token_entry.last_token = last_token
 
         
+        doctor.save(ignore_permissions=True)
         frappe.db.commit()
 
         return new_token

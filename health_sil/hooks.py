@@ -84,6 +84,8 @@ app_license = "mit"
 
 # before_install = "health_sil.install.before_install"
 # after_install = "health_sil.install.after_install"
+after_install = "health_sil.setup.setup_permissions.setup_custom_role_permissions"
+after_migrate = "health_sil.setup.setup_permissions.setup_custom_role_permissions"
 
 # Uninstallation
 # ------------

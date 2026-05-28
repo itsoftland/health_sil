@@ -1,5 +1,6 @@
 import frappe
 import json
+import traceback
 from frappe import _
 from frappe.utils import nowdate, flt
 
@@ -7,18 +8,30 @@ from frappe.utils import nowdate, flt
 @frappe.whitelist()
 def create_sales_invoice(patient, patient_name, doctor=None, items=None, mode_of_payment=None, price_list=None, discount_amount_cash=None, discount_amount_percentage=None):
     """
-    Creates a Sales Invoice and auto-generates Payment Entry
+    Creates a Sales Invoice and auto-generates Payment Entry.
+    Runs under Administrator context to bypass all nested ERPNext permission
+    checks (Serial Batch Bundle, Stock Ledger, GL Entry, etc.) that occur
+    deep inside on_submit hooks. The @frappe.whitelist decorator already
+    ensures only authenticated desk users can call this API.
     """
+    original_user = frappe.session.user
     try:
         customer = get_validated_customer(patient_name)
+
+        # Switch to Administrator for backend doc operations
+        frappe.set_user("Administrator")
+
         # Create and process Sales Invoice
         invoice = create_and_submit_invoice(customer, patient, patient_name, doctor, items, price_list, discount_amount_cash, discount_amount_percentage)
         # Process payment if required
         process_payment(invoice, mode_of_payment) if mode_of_payment else None
+
         return invoice
 
     except Exception as e:
         handle_errors(e)
+    finally:
+        frappe.set_user(original_user)
 
 
 # ----------
@@ -62,8 +75,6 @@ def create_and_submit_invoice(customer, patient, patient_name, doctor, items, pr
     })
 
     invoice.set_missing_values()
-    # invoice.calculate_taxes_and_totals()
-
     invoice.insert(ignore_permissions=True)
     invoice.submit()
     return invoice
@@ -142,7 +153,7 @@ def log_and_notify_payment_error(invoice_name, error):
     """Centralized error handling for payments"""
     frappe.log_error(
         title=_("Payment Processing Failed"),
-        message=f"Invoice: {invoice_name}\nError: {str(error)}"
+        message=f"Invoice: {invoice_name}\nError: {str(error)}\n\nTraceback:\n{traceback.format_exc()}"
     )
 
 def create_payment_entry(invoice, mode_of_payment):
@@ -179,8 +190,14 @@ def get_payment_account(mode, company):
 
 def handle_errors(error):
     """Global error handler"""
+    tb = traceback.format_exc()
     frappe.log_error(
-        title=_("Sales Pipeline Error"),
-        message=f"Error: {str(error)}"
+        title=_("Pharmacy Billing Error"),
+        message=(
+            f"User: {frappe.session.user}\n"
+            f"Roles: {', '.join(frappe.get_roles())}\n"
+            f"Error: {str(error)}\n\n"
+            f"Full Traceback:\n{tb}"
+        )
     )
-    frappe.throw(_("Process failed. Please check error logs for details."))
+    frappe.throw(_("Billing failed: {0}").format(str(error)))
