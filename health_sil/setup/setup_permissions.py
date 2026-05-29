@@ -48,14 +48,14 @@ ROLE_PERMISSIONS = {
     "Reception": _BILLING_PERMISSIONS,
     "Reception Staff": _BILLING_PERMISSIONS,
     "Laboratory Staff": [
-        # lab_test.insert() in laboratory_bill.create_lab_tests_for_bill
-        {"doctype": "Lab Test", "permlevel": 0, "read": 1, "write": 1, "create": 1},
+        # lab_test.insert() and doc.submit() in submit_lab_test_with_results
+        {"doctype": "Lab Test", "permlevel": 0, "read": 1, "write": 1, "create": 1, "submit": 1},
     ],
     "laboratory": [
-        {"doctype": "Lab Test", "permlevel": 0, "read": 1, "write": 1, "create": 1},
+        {"doctype": "Lab Test", "permlevel": 0, "read": 1, "write": 1, "create": 1, "submit": 1},
     ],
     "Laboratory": [
-        {"doctype": "Lab Test", "permlevel": 0, "read": 1, "write": 1, "create": 1},
+        {"doctype": "Lab Test", "permlevel": 0, "read": 1, "write": 1, "create": 1, "submit": 1},
     ],
 }
 
@@ -80,12 +80,29 @@ def setup_custom_role_permissions():
                 "permlevel": permlevel,
             })
             if not existing:
-                existing = frappe.db.exists("Custom DocPerm", {
+                existing_custom = frappe.db.exists("Custom DocPerm", {
                     "parent": doctype,
                     "role": role,
                     "permlevel": permlevel,
                 })
-            if existing:
+                if existing_custom:
+                    # Row exists — update it in place to pick up any new flags
+                    # (e.g. submit was missing previously, Bug G fix)
+                    frappe.db.set_value("Custom DocPerm", existing_custom, {
+                        "read":   perm.get("read",   0),
+                        "write":  perm.get("write",  0),
+                        "create": perm.get("create", 0),
+                        "delete": perm.get("delete", 0),
+                        "submit": perm.get("submit", 0),
+                        "cancel": perm.get("cancel", 0),
+                        "amend":  perm.get("amend",  0),
+                    }, update_modified=False)
+                    frappe.logger().info(
+                        f"[health_sil] Updated {role} permission on {doctype}"
+                    )
+                    continue
+            else:
+                # Built-in DocPerm row exists — skip (cannot modify core perms)
                 continue
 
             custom_perm = frappe.new_doc("Custom DocPerm")

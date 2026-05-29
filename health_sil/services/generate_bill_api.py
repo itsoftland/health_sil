@@ -141,7 +141,7 @@ def validate_and_prepare_item(item):
     }
 
 
-def process_payment(invoice, mode_of_payment):
+def process_payment(invoice, mode_of_payment, original_user=None):
     """Handle payment processing"""
     try:
         validate_mode_of_payment(mode_of_payment, invoice.company)

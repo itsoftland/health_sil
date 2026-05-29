@@ -86,6 +86,7 @@ def create_and_submit_invoice(customer, patient, patient_name, doctor, items, pr
     return invoice
 
 
+
 def validate_and_prepare_item(item):
     """Validate individual item and prepare for insertion"""
     item_code = item.get("item_code")
@@ -117,25 +118,44 @@ def validate_and_prepare_item(item):
 
 
 def get_warehouse_for_batch(item_code, batch_no):
-    """Get the warehouse holding the given batch of an item"""
+    """Get the warehouse holding the given batch of an item.
+
+    In ERPNext v15, batch quantities live in tabSerial and Batch Entry (child of
+    tabSerial and Batch Bundle), linked to tabStock Ledger Entry via
+    serial_and_batch_bundle. tabBin does NOT have a batch_no column.
+
+    Falls back to Batch.warehouse (set during data import) if no SBB transactions
+    exist yet for this batch (e.g. initial stock import with no sales history).
+    """
+    # Priority 1 — Serial and Batch Bundle chain (correct for ERPNext v15).
+    # sbe.qty is positive for inward and negative for outward movements, so
+    # SUM(sbe.qty) per warehouse gives the current net stock for this batch.
     result = frappe.db.sql("""
-        SELECT sle.warehouse as warehouse, SUM(sle.actual_qty) AS actual_qty
-        FROM `tabStock Ledger Entry` sle
-        WHERE sle.item_code = %s
-        AND EXISTS (
-            SELECT 1 FROM `tabBatch` sbb
-            WHERE sbb.batch_id = %s
-        )
+        SELECT sle.warehouse, SUM(sbe.qty) AS net_qty
+        FROM `tabSerial and Batch Entry` sbe
+        INNER JOIN `tabSerial and Batch Bundle` sbb ON sbe.parent = sbb.name
+        INNER JOIN `tabStock Ledger Entry` sle
+               ON sle.serial_and_batch_bundle = sbb.name
+        WHERE sbe.batch_no  = %s
+          AND sle.item_code = %s
+          AND sle.is_cancelled = 0
+          AND sbb.docstatus  = 1
         GROUP BY sle.warehouse
-        HAVING actual_qty > 0
-        ORDER BY actual_qty DESC
+        HAVING net_qty > 0
+        ORDER BY net_qty DESC
         LIMIT 1
-    """, (item_code, batch_no), as_dict=True)
+    """, (batch_no, item_code), as_dict=True)
 
     if result:
         return result[0]["warehouse"]
-    else:
-        frappe.throw(_("No warehouse found with stock for item {0} and batch {1}").format(item_code, batch_no))
+
+    # Priority 2 — Batch.warehouse field (populated during data import for
+    # batches that have no SBB transactions yet, e.g. initial stock import).
+    batch_warehouse = frappe.db.get_value("Batch", batch_no, "warehouse")
+    if batch_warehouse:
+        return batch_warehouse
+
+    frappe.throw(_("No warehouse found with stock for item {0} and batch {1}").format(item_code, batch_no))
 
 
 def process_payment(invoice, mode_of_payment, original_user=None):

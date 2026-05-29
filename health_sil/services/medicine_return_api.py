@@ -102,52 +102,45 @@ def process_medicine_return(pharmacy_billing_name, return_items):
 
 def _get_warehouse_for_batch(item_code, batch_no):
     """
-    Find the warehouse that SOLD from (i.e. last warehouse to deduct this batch).
-    Uses the same SLE query pattern as generate_invoice_api.get_warehouse_for_batch
-    but includes negative qty entries (sales deductions) to find where stock went out.
-    On return we put it back into the same warehouse.
+    Find the warehouse that holds stock for this batch to route the return.
+
+    In ERPNext v15 the SLE.batch_no column is NULL for new transactions —
+    batch info lives in tabSerial and Batch Entry. tabBin also does NOT have
+    a batch_no column. We query through the Serial and Batch Bundle chain.
+
+    Falls back to Batch.warehouse, then item default warehouse.
     """
     if not batch_no:
-        # No batch — use default warehouse from item
         return _get_default_warehouse(item_code)
 
-    # Find the warehouse with the most recent SLE for this batch
-    # ── Priority 1: sale (outward) SLE for this exact item + batch ──────────
-    # actual_qty < 0  →  stock-out entry (Sales Invoice with update_stock=1)
-    # Ordering by posting_date/time descending gives the most recent sale.
+    # Priority 1 — Serial and Batch Bundle chain (correct for ERPNext v15).
+    # SUM(sbe.qty) per warehouse gives the net current stock for this batch.
     result = frappe.db.sql("""
-        SELECT warehouse
-        FROM `tabStock Ledger Entry`
-        WHERE item_code  = %s
-          AND batch_no   = %s
-          AND actual_qty < 0
-          AND docstatus  = 1
-        ORDER BY posting_date DESC, posting_time DESC, creation DESC
+        SELECT sle.warehouse, SUM(sbe.qty) AS net_qty
+        FROM `tabSerial and Batch Entry` sbe
+        INNER JOIN `tabSerial and Batch Bundle` sbb ON sbe.parent = sbb.name
+        INNER JOIN `tabStock Ledger Entry` sle
+               ON sle.serial_and_batch_bundle = sbb.name
+        WHERE sbe.batch_no  = %s
+          AND sle.item_code = %s
+          AND sle.is_cancelled = 0
+          AND sbb.docstatus  = 1
+        GROUP BY sle.warehouse
+        HAVING net_qty > 0
+        ORDER BY net_qty DESC
         LIMIT 1
-    """, (item_code, batch_no), as_dict=True)
+    """, (batch_no, item_code), as_dict=True)
 
     if result:
         return result[0]["warehouse"]
 
-    # ── Priority 2: sale SLE for this item (any batch) ───────────────────────
-    # Useful when the SLE was stored without batch_no but the warehouse is known.
-    result2 = frappe.db.sql("""
-        SELECT warehouse
-        FROM `tabStock Ledger Entry`
-        WHERE item_code  = %s
-          AND actual_qty < 0
-          AND docstatus  = 1
-        ORDER BY posting_date DESC, posting_time DESC, creation DESC
-        LIMIT 1
-    """, (item_code,), as_dict=True)
+    # Priority 2 — Batch.warehouse field (set during data import)
+    batch_warehouse = frappe.db.get_value("Batch", batch_no, "warehouse")
+    if batch_warehouse:
+        return batch_warehouse
 
-    if result2:
-        return result2[0]["warehouse"]
-
-    # ── Priority 3: item default warehouse ───────────────────────────────────
+    # Priority 3 — item default warehouse
     return _get_default_warehouse(item_code)
-
-
 def _get_default_warehouse(item_code):
     """Get item default warehouse or fall back to first enabled warehouse."""
     default_wh = frappe.get_cached_value("Item", item_code, "default_warehouse")
@@ -217,9 +210,20 @@ def _create_stock_ledger_entry(
     sle.flags.ignore_validate_update_after_submit = True
     sle.insert(ignore_permissions=True)
 
-    # SLE must be submitted to be counted
-    frappe.db.set_value("Stock Ledger Entry", sle.name, "docstatus", 1, update_modified=False)
-    frappe.db.commit()
+    # Submit via the document API so on_submit hooks (including
+    # validate_serial_batch_no_bundle) run properly.
+    # We set ignore_serial_batch_bundle_validation because this SLE is a
+    # manual stock correction that does not have a Serial and Batch Bundle
+    # (Bug F fix — replaces the raw db.set_value('docstatus', 1) hack).
+    frappe.flags.ignore_serial_batch_bundle_validation = True
+    try:
+        sle.submit()
+    finally:
+        frappe.flags.ignore_serial_batch_bundle_validation = False
+
+    # NOTE: frappe.db.commit() intentionally removed from here (Bug F fix).
+    # The outer process_medicine_return() commits once after all items succeed,
+    # so a mid-loop failure can roll back all earlier stock entries atomically.
 
     return sle.name
 

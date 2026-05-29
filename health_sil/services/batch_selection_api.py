@@ -29,22 +29,24 @@ def get_batches_for_item(item_code):
     result = []
 
     for b in batches:
-        # Get qty_after_transaction from the latest SLE for this batch
-        # This is the true current stock Frappe tracks internally
-        latest_sle = frappe.db.sql("""
-            SELECT qty_after_transaction
-            FROM `tabStock Ledger Entry`
-            WHERE item_code = %s
-              AND batch_no  = %s
-              AND docstatus = 1
-            ORDER BY posting_date DESC, posting_time DESC, creation DESC
-            LIMIT 1
-        """, (item_code, b.batch_no), as_dict=True)
+        # In ERPNext v15, batch quantities live in Serial and Batch Bundle/Entry,
+        # not in SLE.batch_no (which is always NULL in v15).
+        # Sum SBB entries: positive = inward, negative = outward.
+        sbb_qty = frappe.db.sql("""
+            SELECT COALESCE(SUM(sbe.qty), 0) AS net_qty
+            FROM `tabSerial and Batch Entry` sbe
+            INNER JOIN `tabSerial and Batch Bundle` sbb ON sbe.parent = sbb.name
+            INNER JOIN `tabStock Ledger Entry` sle ON sle.serial_and_batch_bundle = sbb.name
+            WHERE sbe.batch_no  = %s
+              AND sle.item_code = %s
+              AND sle.is_cancelled = 0
+              AND sbb.docstatus  = 1
+        """, (b.batch_no, item_code), as_dict=True)
 
-        if latest_sle:
-            b.qty_available = flt(latest_sle[0].qty_after_transaction)
+        if sbb_qty and sbb_qty[0].net_qty is not None:
+            b.qty_available = flt(sbb_qty[0].net_qty)
         else:
-            # No SLE found — fall back to batch_qty
+            # No SBB entries yet — batch was created via import, use batch_qty directly
             b.qty_available = flt(b.batch_qty or 0)
 
         if b.qty_available > 0:
@@ -64,20 +66,23 @@ def validate_batch_qty(batch_no, qty):
     if not batch_info:
         return {"ok": False, "available": 0, "message": "Batch not found"}
 
-    # Use latest SLE qty_after_transaction for validation too
-    latest_sle = frappe.db.sql("""
-        SELECT qty_after_transaction
-        FROM `tabStock Ledger Entry`
-        WHERE item_code = %s
-          AND batch_no  = %s
-          AND docstatus = 1
-        ORDER BY posting_date DESC, posting_time DESC, creation DESC
-        LIMIT 1
-    """, (batch_info.item, batch_no), as_dict=True)
+    # In ERPNext v15, batch quantities live in Serial and Batch Bundle/Entry.
+    # SLE.batch_no is always NULL in v15, so query SBB directly.
+    sbb_qty = frappe.db.sql("""
+        SELECT COALESCE(SUM(sbe.qty), 0) AS net_qty
+        FROM `tabSerial and Batch Entry` sbe
+        INNER JOIN `tabSerial and Batch Bundle` sbb ON sbe.parent = sbb.name
+        INNER JOIN `tabStock Ledger Entry` sle ON sle.serial_and_batch_bundle = sbb.name
+        WHERE sbe.batch_no  = %s
+          AND sle.item_code = %s
+          AND sle.is_cancelled = 0
+          AND sbb.docstatus  = 1
+    """, (batch_no, batch_info.item), as_dict=True)
 
-    if latest_sle:
-        available = flt(latest_sle[0].qty_after_transaction)
+    if sbb_qty and sbb_qty[0].net_qty is not None:
+        available = flt(sbb_qty[0].net_qty)
     else:
+        # No SBB entries — imported batch, use batch_qty
         available = flt(batch_info.batch_qty or 0)
 
     requested = flt(qty)

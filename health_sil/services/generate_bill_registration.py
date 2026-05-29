@@ -121,29 +121,20 @@ def create_and_submit_invoice_only(patient, patient_name, customer, items, origi
 
 
 def update_patient_registration_details(patient):
-    try:
-        frappe.db.begin()
+    """Mark patient as registered.
 
-        patient_doc = frappe.get_doc("Patient", patient, for_update=True)
+    Intentionally has no explicit frappe.db.commit() or frappe.db.begin().
+    Frappe wraps every @frappe.whitelist() call in a database transaction;
+    if invoice creation or payment fails afterwards, the entire transaction
+    (including this patient save) will roll back automatically (Bug C fix).
+    """
+    patient_doc = frappe.get_doc("Patient", patient)
+    patient_doc.reload()
 
-        if cint(patient_doc.custom_is_registered) == 0:
-            patient_doc.custom_is_registered = 1
-            patient_doc.flags.ignore_permissions = True
-            patient_doc.save(ignore_permissions=True)
-
-        frappe.db.commit()
-
-    except Exception as e:
-        frappe.db.rollback()
-        frappe.log_error(
-            title="Patient Registration Update Error",
-            message=(
-                f"Patient: {patient}\n"
-                f"Error: {str(e)}\n\n"
-                f"Traceback:\n{traceback.format_exc()}"
-            ),
-        )
-        raise
+    if cint(patient_doc.custom_is_registered) == 0:
+        patient_doc.custom_is_registered = 1
+        patient_doc.flags.ignore_permissions = True
+        patient_doc.save(ignore_permissions=True)
 
 
 def validate_and_prepare_item(item):
