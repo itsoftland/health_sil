@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Health SIL — Deep Analysis &amp; Debugging Guide</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #1a1a1a;
+    background: #fff;
+    padding: 0;
+  }
+  /* Cover Page */
+  .cover {
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 80px 60px;
+    background: linear-gradient(135deg, #1a3a5c 0%, #0d6efd 100%);
+    color: white;
+  }
+  .cover .badge {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.4);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 9pt;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+  .cover h1 {
+    font-size: 32pt;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 20px;
+    max-width: 580px;
+  }
+  .cover .subtitle {
+    font-size: 14pt;
+    opacity: 0.85;
+    margin-bottom: 48px;
+    max-width: 520px;
+    line-height: 1.5;
+  }
+  .cover .meta {
+    border-top: 1px solid rgba(255,255,255,0.3);
+    padding-top: 32px;
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 40px;
+  }
+  .cover .meta-item label {
+    display: block;
+    font-size: 8pt;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.65;
+    margin-bottom: 4px;
+  }
+  .cover .meta-item span {
+    font-size: 11pt;
+    font-weight: 600;
+  }
+  /* TOC */
+  .toc-page {
+    page-break-after: always;
+    padding: 60px 60px;
+  }
+  .toc-page h2 {
+    font-size: 18pt;
+    color: #1a3a5c;
+    border-bottom: 3px solid #0d6efd;
+    padding-bottom: 10px;
+    margin-bottom: 28px;
+  }
+  .toc-entry {
+    display: flex;
+    align-items: baseline;
+    padding: 8px 0;
+    border-bottom: 1px dotted #dde;
+    gap: 8px;
+  }
+  .toc-entry .toc-num {
+    font-weight: 700;
+    color: #0d6efd;
+    min-width: 30px;
+  }
+  .toc-entry .toc-title {
+    flex: 1;
+    font-size: 11pt;
+  }
+  .toc-entry .toc-sub {
+    font-size: 9.5pt;
+    color: #555;
+    padding-left: 38px;
+    padding-top: 2px;
+  }
+  /* Content pages */
+  .page {
+    padding: 50px 60px;
+    page-break-after: always;
+  }
+  .page:last-child { page-break-after: avoid; }
+  h1.section-title {
+    font-size: 20pt;
+    color: #1a3a5c;
+    border-bottom: 3px solid #0d6efd;
+    padding-bottom: 10px;
+    margin-bottom: 24px;
+  }
+  h2 {
+    font-size: 14pt;
+    color: #1a3a5c;
+    margin-top: 28px;
+    margin-bottom: 12px;
+    padding-left: 12px;
+    border-left: 4px solid #0d6efd;
+  }
+  h3 {
+    font-size: 11.5pt;
+    color: #0d6efd;
+    margin-top: 20px;
+    margin-bottom: 8px;
+  }
+  p { margin-bottom: 10px; }
+  /* Code blocks */
+  pre {
+    background: #f0f4f8;
+    border: 1px solid #d0dae6;
+    border-left: 4px solid #0d6efd;
+    border-radius: 4px;
+    padding: 14px 16px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 8.5pt;
+    line-height: 1.55;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 10px 0 16px 0;
+  }
+  code {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 8.5pt;
+    background: #eef2f8;
+    border: 1px solid #d0dae6;
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 20px 0;
+    font-size: 10pt;
+  }
+  thead tr {
+    background: #1a3a5c;
+    color: white;
+  }
+  thead th {
+    padding: 9px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  tbody tr:nth-child(even) { background: #f5f8fc; }
+  tbody tr:nth-child(odd)  { background: #fff; }
+  tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e0e8f0;
+    vertical-align: top;
+  }
+  /* Callout boxes */
+  .callout {
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin: 14px 0;
+    border-left: 5px solid;
+  }
+  .callout-danger  { background: #fff0f0; border-color: #dc3545; }
+  .callout-warning { background: #fffbf0; border-color: #fd7e14; }
+  .callout-info    { background: #f0f7ff; border-color: #0d6efd; }
+  .callout-success { background: #f0fff4; border-color: #198754; }
+  .callout .callout-title {
+    font-weight: 700;
+    font-size: 10pt;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .callout-danger  .callout-title { color: #dc3545; }
+  .callout-warning .callout-title { color: #fd7e14; }
+  .callout-info    .callout-title { color: #0d6efd; }
+  .callout-success .callout-title { color: #198754; }
+  /* Flow diagram */
+  .flow {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 9pt;
+    background: #f8fafc;
+    border: 1px solid #d0dae6;
+    border-radius: 6px;
+    padding: 16px 20px;
+    line-height: 1.8;
+    margin: 14px 0;
+  }
+  /* Priority badge */
+  .priority {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 8pt;
+    font-weight: 700;
+    margin-right: 6px;
+  }
+  .p1 { background: #dc3545; color: white; }
+  .p2 { background: #fd7e14; color: white; }
+  .p3 { background: #0d6efd; color: white; }
+  .p4 { background: #6c757d; color: white; }
+  .p5 { background: #adb5bd; color: white; }
+  /* File ref */
+  .file-ref {
+    font-family: 'Courier New', monospace;
+    font-size: 8.5pt;
+    color: #0d6efd;
+  }
+  /* Footer */
+  @page {
+    margin: 0;
+    size: A4;
+  }
+  .footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 36px;
+    background: #1a3a5c;
+    color: white;
+    font-size: 8pt;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+  }
+  ul { margin: 8px 0 12px 22px; }
+  li { margin-bottom: 5px; }
+  ol { margin: 8px 0 12px 22px; }
+  .divider {
+    height: 2px;
+    background: linear-gradient(to right, #0d6efd, transparent);
+    margin: 20px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div class="cover">
+  <div class="badge">Technical Reference Document</div>
+  <h1>Health SIL<br>Deep Analysis &amp; Debugging Guide</h1>
+  <p class="subtitle">Pharmacy Billing Workflow — Sales Invoice Creation, Batch Quantity, and Permission Diagnostics for the Frappe ERP custom app.</p>
+  <div class="meta">
+    <div class="meta-item"><label>Framework</label><span>Frappe / ERPNext v15</span></div>
+    <div class="meta-item"><label>Application</label><span>health_sil</span></div>
+    <div class="meta-item"><label>Focus Module</label><span>Pharmacy Billing</span></div>
+    <div class="meta-item"><label>Date</label><span>June 2026</span></div>
+    <div class="meta-item"><label>Constraint</label><span>No core framework edits</span></div>
+  </div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc-page">
+  <h2>Table of Contents</h2>
+  <div class="toc-entry"><span class="toc-num">1</span><span class="toc-title">Complete Pharmacy Billing Workflow</span></div>
+  <div class="toc-entry toc-sub"><span>— Doctypes involved, call chain, trigger sequence</span></div>
+  <div class="toc-entry"><span class="toc-num">2</span><span class="toc-title">Why Sales Invoice Is Not Being Created</span></div>
+  <div class="toc-entry toc-sub"><span>— Silent failure analysis, root cause, error log location</span></div>
+  <div class="toc-entry"><span class="toc-num">3</span><span class="toc-title">Structured Debugging Checklist</span></div>
+  <div class="toc-entry toc-sub"><span>— Step-by-step console commands, log queries, live permission checks</span></div>
+  <div class="toc-entry"><span class="toc-num">4</span><span class="toc-title">Permission Analysis</span></div>
+  <div class="toc-entry toc-sub"><span>— How permission changes break invoice creation, repair procedure</span></div>
+  <div class="toc-entry"><span class="toc-num">5</span><span class="toc-title">Batch &amp; Stock Issue Analysis</span></div>
+  <div class="toc-entry toc-sub"><span>— Dual-mechanism divergence, diagnostic SQL, fix direction</span></div>
+  <div class="toc-entry"><span class="toc-num">6</span><span class="toc-title">Code Fix Risk Analysis</span></div>
+  <div class="toc-entry toc-sub"><span>— Four high-probability risk areas in existing code patterns</span></div>
+  <div class="toc-entry"><span class="toc-num">7</span><span class="toc-title">Best Practices &amp; Safe Debugging</span></div>
+  <div class="toc-entry toc-sub"><span>— Logging, permission validation script, dev/prod isolation</span></div>
+  <div class="toc-entry"><span class="toc-num">8</span><span class="toc-title">Immediate Action List</span></div>
+  <div class="toc-entry toc-sub"><span>— Prioritised checklist to resolve all three issues today</span></div>
+</div>
+
+<!-- SECTION 1 -->
+<div class="page">
+  <h1 class="section-title">1. Complete Pharmacy Billing Workflow</h1>
+
+  <p>The billing workflow is triggered entirely from the client side (JavaScript). There is <strong>no <code>on_submit</code> hook on Pharmacy Billing</strong> in <span class="file-ref">hooks.py</span> — the JS form calls the whitelisted Python API directly.</p>
+
+  <h2>End-to-End Call Chain</h2>
+  <div class="flow">User fills Pharmacy Billing form  (DocType: pharmacy_billing)
+    |
+    |-- JS calls: batch_selection_api.get_batches_for_item()    [per medicine row]
+    |-- JS calls: batch_selection_api.validate_batch_qty()       [before submit]
+    |
+User clicks Submit
+    |
+    |-- JS calls @frappe.whitelist:
+    |       generate_invoice_api.create_sales_invoice()
+    |           |
+    |           |-- get_validated_customer()           &lt;-- runs as ORIGINAL USER
+    |           |-- frappe.set_user("Administrator")
+    |           |
+    |           |-- create_and_submit_invoice()        &lt;-- runs as Administrator
+    |           |       |-- validate_and_prepare_item() per row
+    |           |       |       |-- get_warehouse_for_batch()   if Medications + batch_no
+    |           |       |               |-- Query: tabSerial and Batch Entry
+    |           |       |               |          tabSerial and Batch Bundle
+    |           |       |               |          tabStock Ledger Entry
+    |           |       |               |-- Fallback: Batch.warehouse field
+    |           |       |
+    |           |       |-- invoice.insert(ignore_permissions=True)
+    |           |       |-- invoice.submit()
+    |           |               |
+    |           |               |-- ERPNext internal: make_serial_and_batch_bundle()
+    |           |               |       |-- doc.save()    &lt;-- NO ignore_permissions!
+    |           |               |       |-- doc.submit()  &lt;-- NO ignore_permissions!
+    |           |               |-- Creates Stock Ledger Entry
+    |           |               |-- Creates GL Entries (with flags.ignore_permissions)
+    |           |
+    |           |-- process_payment()   if mode_of_payment provided
+    |                   |-- create_payment_entry()
+    |                           |-- pe.insert(ignore_permissions=True)
+    |                           |-- pe.submit()
+    |
+    |-- finally: frappe.set_user(original_user)   &lt;-- ALWAYS runs</div>
+
+  <h2>Key Doctypes</h2>
+  <table>
+    <thead><tr><th>DocType</th><th>Role in Workflow</th><th>Submittable</th></tr></thead>
+    <tbody>
+      <tr><td><code>Pharmacy Billing</code></td><td>The form the user fills; child table <code>Pharmaceuticals</code> holds medicine rows</td><td>Yes</td></tr>
+      <tr><td><code>Pharmaceuticals</code></td><td>Child table — item_code, batch, qty, rate, expiry per line</td><td>—</td></tr>
+      <tr><td><code>Sales Invoice</code></td><td>Created by <span class="file-ref">generate_invoice_api.py</span> with <code>update_stock=1</code> for medications</td><td>Yes</td></tr>
+      <tr><td><code>Payment Entry</code></td><td>Created automatically if mode_of_payment is provided</td><td>Yes</td></tr>
+      <tr><td><code>Serial and Batch Bundle</code></td><td>Auto-created by ERPNext on invoice submit; tracks batch movements</td><td>Yes</td></tr>
+      <tr><td><code>Serial and Batch Entry</code></td><td>Child rows of SBB; one per batch line; holds qty (positive=in, negative=out)</td><td>—</td></tr>
+      <tr><td><code>Stock Ledger Entry</code></td><td>Authoritative stock movement record; linked to SBB</td><td>Yes</td></tr>
+      <tr><td><code>Batch</code></td><td>Master record; <code>batch_qty</code> field maintained separately (not always in sync with SLE)</td><td>No</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Key Service Files</h2>
+  <table>
+    <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><span class="file-ref">services/generate_invoice_api.py</span></td><td>Primary pharmacy Sales Invoice + Payment Entry creation</td></tr>
+      <tr><td><span class="file-ref">services/generate_bill_api.py</span></td><td>Consultation invoice + Patient Encounter creation</td></tr>
+      <tr><td><span class="file-ref">services/batch_selection_api.py</span></td><td>Batch listing, qty validation, and direct batch_qty deduction</td></tr>
+      <tr><td><span class="file-ref">services/medicine_return_api.py</span></td><td>Returns processing with manual Stock Ledger Entry creation</td></tr>
+      <tr><td><span class="file-ref">setup/setup_permissions.py</span></td><td>Idempotent role permission setup — re-runnable at any time</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 2 -->
+<div class="page">
+  <h1 class="section-title">2. Why Sales Invoice Is Not Being Created</h1>
+
+  <div class="callout callout-danger">
+    <div class="callout-title">Root Cause Summary</div>
+    The failure is <strong>silent by design</strong>. The <code>handle_errors()</code> function in <span class="file-ref">generate_invoice_api.py:30–31</span> catches ALL exceptions, logs the full traceback to <code>frappe.log_error</code>, then throws a generic "Process failed" message to the user. The Sales Invoice was never created — but the error detail is in the Error Log.
+  </div>
+
+  <h2>The Silent Failure Pattern (Code Reference)</h2>
+  <pre>
+# generate_invoice_api.py — lines 30-33
+except Exception as e:
+    handle_errors(e, original_user)   # &lt;-- logs full traceback, throws generic msg
+finally:
+    frappe.set_user(original_user)    # &lt;-- ALWAYS resets user session</pre>
+
+  <p>The <code>handle_errors()</code> function at line 237–249 logs: the user email, their roles at time of failure, the error message, and the full Python traceback. All of this is in the Frappe Error Log.</p>
+
+  <h2>How to Read the Error Log</h2>
+  <pre>
+# Option 1 — Live tail from bench directory:
+cd ~/frappe-bench
+tail -f sites/your-site/logs/frappe.log | grep -A 20 "Pharmacy Billing Error"
+
+# Option 2 — Frappe Desk UI:
+# Settings &gt; Error Log &gt; filter Title = "Pharmacy Billing Error"
+# OR Title = "Payment Processing Failed"
+
+# Option 3 — bench console query:
+bench --site your-site console
+&gt;&gt;&gt; import frappe
+&gt;&gt;&gt; logs = frappe.get_all("Error Log",
+...     filters={"title": "Pharmacy Billing Error"},
+...     fields=["name", "creation", "error"],
+...     order_by="creation desc", limit=5)
+&gt;&gt;&gt; print(logs[0].error)   # Full traceback of the last failure</pre>
+
+  <h2>Most Likely Root Cause After Permission Change</h2>
+  <p>When a user with a restricted role submits a Sales Invoice with <code>update_stock=1</code> and a <code>batch_no</code>, ERPNext internally calls <code>make_serial_and_batch_bundle()</code>. That internal function calls <code>doc.save()</code> and <code>doc.submit()</code> <strong>without setting <code>ignore_permissions=True</code></strong>. This is documented in the codebase at <span class="file-ref">setup_permissions.py:17–19</span>:</p>
+
+  <div class="callout callout-warning">
+    <div class="callout-title">Critical Permission — Serial and Batch Bundle</div>
+    ERPNext's <code>make_serial_and_batch_bundle</code> does <code>doc.save()</code> and <code>doc.submit()</code> WITHOUT setting <code>ignore_permissions</code>. The calling user therefore needs <strong>read, write, create, and submit</strong> permissions on <code>Serial and Batch Bundle</code>. If this was revoked, every pharmacy invoice silently fails at the stock deduction step.
+  </div>
+
+  <pre>
+# setup_permissions.py — line 36 (the critical permission entry):
+{"doctype": "Serial and Batch Bundle", "permlevel": 0,
+ "read": 1, "write": 1, "create": 1, "submit": 1},</pre>
+
+  <h2>Check if Invoice Was Created but Payment Failed</h2>
+  <p><code>process_payment()</code> wraps payment errors separately (line 161–168). The invoice may exist even when the user saw an error. Always check:</p>
+  <pre>
+bench --site your-site console
+&gt;&gt;&gt; frappe.get_all("Sales Invoice",
+...     filters={"patient_name": "PAT-0001"},   # replace with actual
+...     fields=["name", "status", "outstanding_amount"],
+...     order_by="creation desc", limit=3)</pre>
+</div>
+
+<!-- SECTION 3 -->
+<div class="page">
+  <h1 class="section-title">3. Structured Debugging Checklist</h1>
+
+  <h2>Step 1 — Read the Actual Error First</h2>
+  <p>Do not guess. The full traceback, username, and role list are stored in the Error Log on every failure. This step takes 30 seconds and will tell you the exact line that failed.</p>
+  <pre>
+# Frappe Desk: Settings &gt; Error Log &gt; Title = "Pharmacy Billing Error"
+# OR from bench console:
+bench --site your-site console
+&gt;&gt;&gt; import frappe
+&gt;&gt;&gt; log = frappe.get_all("Error Log", filters={"title": "Pharmacy Billing Error"},
+...     fields=["error"], order_by="creation desc", limit=1)
+&gt;&gt;&gt; print(log[0].error)</pre>
+
+  <h2>Step 2 — Confirm the API Was Actually Called</h2>
+  <pre>
+# Check web access log for the whitelist call:
+tail -f sites/your-site/logs/web.log | grep generate_invoice_api</pre>
+
+  <h2>Step 3 — Verify Permissions Live for the Affected User</h2>
+  <pre>
+bench --site your-site console
+&gt;&gt;&gt; import frappe
+&gt;&gt;&gt; frappe.set_user("pharmacy.user@example.com")  # actual user email
+
+&gt;&gt;&gt; checks = [
+...     ("Serial and Batch Bundle", "submit"),
+...     ("Serial and Batch Bundle", "create"),
+...     ("Sales Invoice", "create"),
+...     ("Customer", "read"),
+...     ("Item", "read"),
+...     ("Warehouse", "read"),
+...     ("Mode of Payment", "read"),
+... ]
+&gt;&gt;&gt; for dt, ptype in checks:
+...     ok = frappe.has_permission(dt, ptype)
+...     print(f"{'OK  ' if ok else 'FAIL'} — {ptype:8s} on {dt}")</pre>
+
+  <h2>Step 4 — Verify Customer Link on Patient</h2>
+  <pre>
+# get_validated_customer() at line 39-48 runs as ORIGINAL USER.
+# If it fails, the user switch to Administrator never happens.
+&gt;&gt;&gt; frappe.set_user("pharmacy.user@example.com")
+&gt;&gt;&gt; patient = "PAT-0001"   # replace with actual patient ID
+&gt;&gt;&gt; customer = frappe.get_cached_value("Patient", patient, "customer")
+&gt;&gt;&gt; print("Customer:", customer)
+&gt;&gt;&gt; if customer:
+...     disabled = frappe.get_cached_value("Customer", customer, "disabled")
+...     print("Disabled:", disabled)</pre>
+
+  <h2>Step 5 — Check Background Job Queue</h2>
+  <pre>
+# In Frappe Desk: Settings &gt; System &gt; Background Jobs
+# Look for: failed jobs, queued jobs related to your billing doctype
+
+# Or from bench:
+bench --site your-site jobs</pre>
+
+  <h2>Step 6 — Verify Hooks Are Loaded Correctly</h2>
+  <pre>
+bench --site your-site console
+&gt;&gt;&gt; import frappe
+&gt;&gt;&gt; hooks = frappe.get_hooks("doc_events")
+&gt;&gt;&gt; print(hooks.get("Laboratory Bill"))
+&gt;&gt;&gt; print(hooks.get("Purchase Invoice"))
+# Note: Pharmacy Billing has NO on_submit hook — the JS calls the API directly.
+# If the JS form script is broken, no hook will fire and nothing happens silently.</pre>
+
+  <h2>Step 7 — Check Client Scripts (JS)</h2>
+  <p>The billing trigger lives in a client script fixture. Check it is loaded and calling the correct API path.</p>
+  <pre>
+# In Frappe Desk: Customise &gt; Client Script
+# OR in fixtures file:
+# health_sil/fixtures/client_script.json
+# Look for: generate_invoice_api.create_sales_invoice
+# Verify the module path matches the actual file location</pre>
+</div>
+
+<!-- SECTION 4 -->
+<div class="page">
+  <h1 class="section-title">4. Permission Analysis</h1>
+
+  <h2>How the App Bypasses Permissions (Design Intent)</h2>
+  <p>The app uses a two-step pattern for billing APIs to allow restricted roles to create invoices without granting them broad access:</p>
+  <ol>
+    <li>API runs as <code>original_user</code> for initial validation (Customer lookup)</li>
+    <li>API switches to Administrator via <code>frappe.set_user("Administrator")</code></li>
+    <li>Invoice/Payment Entry created with <code>ignore_permissions=True</code></li>
+    <li>Ownership patched back to original user via <code>frappe.db.set_value</code></li>
+  </ol>
+  <p>This is safe and intentional — it preserves the audit trail while bypassing ERPNext's often over-restrictive permission model for nested document operations.</p>
+
+  <h2>What Permissions Are Required and Why</h2>
+  <table>
+    <thead><tr><th>DocType</th><th>Permissions Needed</th><th>Why (cannot be bypassed)</th></tr></thead>
+    <tbody>
+      <tr><td><code>Serial and Batch Bundle</code></td><td>read, write, create, <strong>submit</strong></td><td>ERPNext calls <code>doc.save()</code> + <code>doc.submit()</code> with NO <code>ignore_permissions</code></td></tr>
+      <tr><td><code>Customer</code></td><td>read</td><td><code>get_validated_customer()</code> runs as original user BEFORE Administrator switch</td></tr>
+      <tr><td><code>Item</code></td><td>read</td><td>Item group lookup in <code>validate_and_prepare_item()</code></td></tr>
+      <tr><td><code>Account</code></td><td>read</td><td>Invoice validation calls <code>_get_party_details()</code> internally</td></tr>
+      <tr><td><code>Warehouse</code></td><td>read</td><td>Warehouse lookup in batch queries</td></tr>
+      <tr><td><code>Mode of Payment</code></td><td>read</td><td><code>validate_mode_of_payment()</code> checks MoP exists</td></tr>
+      <tr><td><code>Price List</code></td><td>read</td><td>Invoice <code>set_missing_values()</code> reads price list</td></tr>
+      <tr><td><code>Item Price</code></td><td>read</td><td>Price fetching during invoice build</td></tr>
+      <tr><td><code>Stock Ledger Entry</code></td><td><em>not needed</em></td><td>ERPNext sets <code>flags.ignore_permissions</code> internally in <code>stock_ledger.make_entry</code></td></tr>
+      <tr><td><code>Payment Entry</code></td><td><em>not needed</em></td><td>PE doc uses <code>ignore_permissions=True</code> on insert</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Permission Repair Procedure</h2>
+  <p>The <span class="file-ref">setup_permissions.py</span> function is idempotent — running it multiple times is safe. It checks for existing rows before creating, and updates existing rows if flags were missing.</p>
+
+  <pre>
+# Step 1 — Re-run the permission setup:
+bench --site your-site console
+&gt;&gt;&gt; from health_sil.setup.setup_permissions import setup_custom_role_permissions
+&gt;&gt;&gt; setup_custom_role_permissions()
+# Output should show: "[health_sil] Updated/Added {role} permission on {doctype}"
+# The function commits and clears cache internally.
+
+# Step 2 — Hard cache clear (belt and braces):
+# Exit console, then:
+bench --site your-site clear-cache
+bench --site your-site clear-website-cache</pre>
+
+  <div class="callout callout-success">
+    <div class="callout-title">Why This Survives bench update</div>
+    The setup function creates <code>Custom DocPerm</code> rows (not core <code>DocPerm</code>). Frappe preserves custom permissions across framework updates, so your role permissions will not be wiped by <code>bench update</code>. The function is also called from the <code>after_migrate</code> hook, so it re-runs automatically after every migration.
+  </div>
+
+  <h2>How to Test Permission Changes Safely</h2>
+  <pre>
+# 1. Create a test user with only the pharmacy role on a dev site
+# 2. Test the full billing flow as that user
+# 3. Before making ANY permission change in production, export fixtures first:
+bench --site your-site export-fixtures --app health_sil
+git add health_sil/fixtures/ &amp;&amp; git commit -m "snapshot: permissions before change"
+# 4. Make the change
+# 5. If it breaks, revert the fixture file and reimport:
+bench --site your-site import-doc health_sil/fixtures/custom_field.json</pre>
+</div>
+
+<!-- SECTION 5 -->
+<div class="page">
+  <h1 class="section-title">5. Batch &amp; Stock Issue Analysis</h1>
+
+  <h2>Two Parallel Mechanisms — The Core Problem</h2>
+  <p>The codebase contains <strong>two separate mechanisms</strong> for tracking batch stock. When both run on the same transaction, stock quantities diverge.</p>
+
+  <table>
+    <thead><tr><th>Mechanism</th><th>File / Line</th><th>How It Works</th><th>Authoritative?</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>A — Sales Invoice SLE</strong></td>
+        <td><span class="file-ref">generate_invoice_api.py:69</span></td>
+        <td>Sets <code>update_stock=1</code>. ERPNext creates SBB → SBE → SLE on submit. Deducts stock via proper accounting entries.</td>
+        <td>Yes — this is correct</td>
+      </tr>
+      <tr>
+        <td><strong>B — Direct batch_qty</strong></td>
+        <td><span class="file-ref">batch_selection_api.py:104</span></td>
+        <td>Directly sets <code>Batch.batch_qty</code> via <code>frappe.db.set_value</code>. No SLE, no SBB created. Commits immediately.</td>
+        <td>No — deprecated shortcut</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-danger">
+    <div class="callout-title">Double Deduction Risk</div>
+    If a client script calls <code>deduct_batch_stock()</code> AND the Sales Invoice is created with <code>update_stock=1</code> for the same batch, the stock is deducted twice: once in <code>Batch.batch_qty</code> and once via SLE. The <code>batch_qty</code> field will show less stock than actually exists.
+  </div>
+
+  <h2>How Batch Availability Is Queried (ERPNext v15)</h2>
+  <p>In ERPNext v15, <code>SLE.batch_no</code> is always NULL. Batch quantities live in the <code>Serial and Batch Entry</code> table. The correct query pattern (used in <span class="file-ref">batch_selection_api.py:35–44</span>):</p>
+  <pre>
+SELECT COALESCE(SUM(sbe.qty), 0) AS net_qty
+FROM `tabSerial and Batch Entry` sbe
+INNER JOIN `tabSerial and Batch Bundle` sbb ON sbe.parent = sbb.name
+INNER JOIN `tabStock Ledger Entry` sle ON sle.serial_and_batch_bundle = sbb.name
+WHERE sbe.batch_no  = %s
+  AND sle.item_code = %s
+  AND sle.is_cancelled = 0
+  AND sbb.docstatus  = 1
+-- sbe.qty: positive = inward, negative = outward
+-- SUM gives net available quantity</pre>
+
+  <p>For batches imported directly (no purchase invoice, no SBB), the fallback is <code>Batch.batch_qty</code>.</p>
+
+  <h2>Diagnostic SQL — Detect Divergence</h2>
+  <p>Run this in bench console or directly in MySQL to find batches where <code>batch_qty</code> disagrees with actual SBB stock:</p>
+  <pre>
+bench --site your-site mariadb
+-- or in bench console: frappe.db.sql("""...""", as_dict=True)
+
+SELECT
+    b.name          AS batch_no,
+    b.item,
+    b.batch_qty     AS stored_batch_qty,
+    COALESCE(SUM(sbe.qty), 0) AS sbb_net_qty,
+    (b.batch_qty - COALESCE(SUM(sbe.qty), 0)) AS divergence
+FROM `tabBatch` b
+LEFT JOIN `tabSerial and Batch Entry` sbe ON sbe.batch_no = b.name
+LEFT JOIN `tabSerial and Batch Bundle` sbb
+    ON sbe.parent = sbb.name AND sbb.docstatus = 1
+LEFT JOIN `tabStock Ledger Entry` sle
+    ON sle.serial_and_batch_bundle = sbb.name AND sle.is_cancelled = 0
+WHERE b.item = 'YOUR-ITEM-CODE'   -- replace
+GROUP BY b.name, b.batch_qty
+HAVING ABS(divergence) &gt; 0;
+-- divergence != 0 means deduct_batch_stock() ran without a matching SLE</pre>
+
+  <h2>Trace a Specific Batch's Complete History</h2>
+  <pre>
+bench --site your-site console
+&gt;&gt;&gt; import frappe
+&gt;&gt;&gt; batch_no = "BATCH-0001"   # replace with actual
+&gt;&gt;&gt; sles = frappe.db.sql("""
+...     SELECT sle.posting_date, sle.voucher_type, sle.voucher_no,
+...            sle.actual_qty, sle.qty_after_transaction, sle.warehouse
+...     FROM `tabStock Ledger Entry` sle
+...     WHERE sle.item_code = (
+...         SELECT item FROM `tabBatch` WHERE name = %s
+...     )
+...     AND sle.is_cancelled = 0
+...     ORDER BY sle.posting_date, sle.creation
+... """, batch_no, as_dict=True)
+&gt;&gt;&gt; for s in sles: print(s)</pre>
+
+  <h2>Fix Direction</h2>
+  <ul>
+    <li>If <code>deduct_batch_stock()</code> is called from a client script alongside invoice creation: <strong>remove the client-side call</strong>. The SLE from <code>update_stock=1</code> is the single source of truth.</li>
+    <li>If batches were imported and have no SBB history, the <code>batch_qty</code> fallback in <span class="file-ref">batch_selection_api.py:50</span> is correct and intentional.</li>
+    <li>Do NOT manually update <code>batch_qty</code> to fix divergence — create a corrective Stock Reconciliation entry instead, which will generate the proper SLE and keep the audit trail intact.</li>
+  </ul>
+</div>
+
+<!-- SECTION 6 -->
+<div class="page">
+  <h1 class="section-title">6. Code Fix Risk Analysis</h1>
+
+  <p>Based on the patterns in the existing codebase, here are the four highest-probability risk areas to evaluate against any fix. Share your code snippet for a precise review against these points.</p>
+
+  <h2>Risk Area 1 — Administrator Switch Scope</h2>
+  <p><span class="file-ref">generate_invoice_api.py:15–20</span></p>
+  <pre>
+original_user = frappe.session.user
+try:
+    customer = get_validated_customer(patient_name)   # &lt;-- RUNS AS original_user
+    frappe.set_user("Administrator")                  # &lt;-- switch happens HERE</pre>
+
+  <div class="callout callout-warning">
+    <div class="callout-title">Risk</div>
+    Any code your fix adds <em>before</em> <code>frappe.set_user("Administrator")</code> runs as the restricted original user. If that code reads a protected doctype, it fails silently in the except block. If your fix moves the Administrator switch later, more code runs as the restricted user than intended.
+  </div>
+
+  <h2>Risk Area 2 — The finally Block Guarantees User Reset</h2>
+  <p><span class="file-ref">generate_invoice_api.py:33</span></p>
+  <pre>
+finally:
+    frappe.set_user(original_user)   # ALWAYS runs, even on exception</pre>
+  <div class="callout callout-info">
+    <div class="callout-title">Safe Pattern</div>
+    A <code>return</code> inside the <code>try</code> block still triggers <code>finally</code>. However, if your fix introduces a <em>second</em> <code>frappe.set_user()</code> call inside the <code>try</code> block without a matching <code>finally</code>, a mid-function exception will leave the session as that user until the request ends.
+  </div>
+
+  <h2>Risk Area 3 — Double Commit in Batch Operations</h2>
+  <p><span class="file-ref">batch_selection_api.py:124</span></p>
+  <pre>
+frappe.db.set_value("Batch", batch_no, "batch_qty", new_qty)
+frappe.db.commit()   # &lt;-- commits immediately, outside any outer transaction</pre>
+  <div class="callout callout-danger">
+    <div class="callout-title">Risk</div>
+    If your fix calls <code>deduct_batch_stock()</code> from inside <code>create_and_submit_invoice()</code>, the <code>frappe.db.commit()</code> at line 124 fires mid-transaction. If <code>invoice.submit()</code> later fails, the database rolls back the invoice but <code>batch_qty</code> has already been committed. You now have a stock count that is lower than the actual SLE-tracked quantity.
+  </div>
+
+  <h2>Risk Area 4 — ignore_permissions Does Not Cover SBB</h2>
+  <p><span class="file-ref">generate_invoice_api.py:77</span> and <span class="file-ref">setup_permissions.py:34–36</span></p>
+  <pre>
+# invoice.insert(ignore_permissions=True) covers the Sales Invoice document.
+# But ERPNext's make_serial_and_batch_bundle() inside invoice.submit()
+# calls its own doc.save() and doc.submit() — WITHOUT ignore_permissions.
+# Only the user's role permissions on Serial and Batch Bundle matter there.</pre>
+  <div class="callout callout-warning">
+    <div class="callout-title">Risk</div>
+    If your fix removes the <code>frappe.set_user("Administrator")</code> call and instead relies only on <code>ignore_permissions=True</code> on the invoice, the invoice insert will succeed but the SBB creation triggered by submit will fail for any user without the explicit <code>Serial and Batch Bundle</code> submit permission.
+  </div>
+</div>
+
+<!-- SECTION 7 -->
+<div class="page">
+  <h1 class="section-title">7. Best Practices &amp; Safe Debugging</h1>
+
+  <h2>Add Temporary Debug Logging (Non-Destructive)</h2>
+  <pre>
+# Add to any service function temporarily — remove before production:
+import frappe
+frappe.logger("health_sil").debug(
+    f"[pharmacy-debug] user={frappe.session.user} "
+    f"batch={batch_no} qty={qty} warehouse={warehouse}"
+)
+
+# Read from bench:
+tail -f sites/your-site/logs/frappe.log | grep pharmacy-debug</pre>
+
+  <h2>Full Permissions Validation Script (Copy-Paste Ready)</h2>
+  <pre>
+bench --site your-site console
+&gt;&gt;&gt; import frappe
+&gt;&gt;&gt; user = "pharmacy.user@example.com"   # replace
+&gt;&gt;&gt; frappe.set_user(user)
+&gt;&gt;&gt; print("Roles:", frappe.get_roles())
+&gt;&gt;&gt; critical = [
+...     ("Serial and Batch Bundle", "read"),
+...     ("Serial and Batch Bundle", "write"),
+...     ("Serial and Batch Bundle", "create"),
+...     ("Serial and Batch Bundle", "submit"),
+...     ("Sales Invoice", "create"),
+...     ("Customer", "read"),
+...     ("Item", "read"),
+...     ("Account", "read"),
+...     ("Warehouse", "read"),
+...     ("Mode of Payment", "read"),
+...     ("Price List", "read"),
+...     ("Item Price", "read"),
+... ]
+&gt;&gt;&gt; missing = []
+&gt;&gt;&gt; for dt, pt in critical:
+...     ok = frappe.has_permission(dt, pt)
+...     status = "OK  " if ok else "FAIL"
+...     print(f"{status} — {pt:8s} on {dt}")
+...     if not ok: missing.append((dt, pt))
+&gt;&gt;&gt; if missing:
+...     print(f"\n{len(missing)} permission(s) missing — run setup_custom_role_permissions()")
+... else:
+...     print("\nAll permissions OK")</pre>
+
+  <h2>Safe Production Debugging Workflow</h2>
+  <ol>
+    <li><strong>Read Error Log first</strong> — never guess; the traceback is always in Frappe Error Log</li>
+    <li><strong>Reproduce on dev site</strong> — use <code>bench --site dev-site</code> with a copy of production data</li>
+    <li><strong>Export fixtures before any change</strong> — <code>bench export-fixtures --app health_sil</code> + git commit</li>
+    <li><strong>Run permission setup idempotently</strong> — <code>setup_custom_role_permissions()</code> is safe to call anytime</li>
+    <li><strong>Clear cache after permission changes</strong> — Frappe caches permissions aggressively; a stale cache can make valid permissions appear broken</li>
+    <li><strong>Never modify core Frappe/ERPNext files</strong> — use <code>Custom DocPerm</code> for permissions, <code>Custom Script</code> for JS, server scripts for Python overrides</li>
+  </ol>
+
+  <h2>Scheduler / Background Job Debugging</h2>
+  <pre>
+# Check if scheduler is running:
+bench --site your-site doctor
+
+# View queued/failed jobs:
+bench --site your-site jobs
+
+# Manually trigger a scheduled task for testing:
+bench --site your-site execute health_sil.services.batch_api.notify_batches_due_today</pre>
+</div>
+
+<!-- SECTION 8 -->
+<div class="page">
+  <h1 class="section-title">8. Immediate Action List</h1>
+
+  <p>Work through these in order. Each step takes less than 5 minutes.</p>
+
+  <table>
+    <thead><tr><th>Priority</th><th>Action</th><th>Where / Command</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="priority p1">P1</span></td>
+        <td><strong>Read the Error Log</strong> — get the exact traceback</td>
+        <td>Frappe Desk &rarr; Error Log &rarr; Title = "Pharmacy Billing Error"</td>
+      </tr>
+      <tr>
+        <td><span class="priority p1">P1</span></td>
+        <td><strong>Re-run permission setup</strong> to restore any revoked permissions</td>
+        <td><code>from health_sil.setup.setup_permissions import setup_custom_role_permissions; setup_custom_role_permissions()</code></td>
+      </tr>
+      <tr>
+        <td><span class="priority p2">P2</span></td>
+        <td><strong>Clear cache</strong> after permission restore</td>
+        <td><code>bench --site your-site clear-cache</code></td>
+      </tr>
+      <tr>
+        <td><span class="priority p2">P2</span></td>
+        <td><strong>Run the permissions validation script</strong> as the affected user</td>
+        <td>See Section 7 — copy-paste script into bench console</td>
+      </tr>
+      <tr>
+        <td><span class="priority p3">P3</span></td>
+        <td><strong>Check if Sales Invoice exists</strong> despite error message</td>
+        <td><code>frappe.get_all("Sales Invoice", filters={"patient_name": "..."}, ...)</code></td>
+      </tr>
+      <tr>
+        <td><span class="priority p3">P3</span></td>
+        <td><strong>Run divergence diagnostic SQL</strong> for batch quantities</td>
+        <td>See Section 5 — SQL query comparing <code>batch_qty</code> vs SBB net qty</td>
+      </tr>
+      <tr>
+        <td><span class="priority p4">P4</span></td>
+        <td><strong>Check if <code>deduct_batch_stock()</code> is called</strong> alongside invoice creation in client script</td>
+        <td>Frappe Desk &rarr; Client Script; search for <code>deduct_batch_stock</code></td>
+      </tr>
+      <tr>
+        <td><span class="priority p5">P5</span></td>
+        <td><strong>Share your fix code</strong> for precise risk analysis against the 4 risk areas</td>
+        <td>See Section 6 — risk areas 1–4</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="divider"></div>
+
+  <h2>Key File Reference</h2>
+  <table>
+    <thead><tr><th>File</th><th>Critical Lines</th><th>Relevance</th></tr></thead>
+    <tbody>
+      <tr><td><span class="file-ref">services/generate_invoice_api.py</span></td><td>15–33, 69, 77–78</td><td>Main invoice creation; Administrator switch; ignore_permissions</td></tr>
+      <tr><td><span class="file-ref">services/batch_selection_api.py</span></td><td>35–54, 104–124</td><td>Batch availability query; direct batch_qty deduction</td></tr>
+      <tr><td><span class="file-ref">setup/setup_permissions.py</span></td><td>23–36, 63–127</td><td>Permission definitions; idempotent setup function</td></tr>
+      <tr><td><span class="file-ref">hooks.py</span></td><td>150–171</td><td>All doc_events; note: Pharmacy Billing has no on_submit hook</td></tr>
+      <tr><td><span class="file-ref">services/medicine_return_api.py</span></td><td>103–228</td><td>Returns processing; manual SLE creation pattern</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Reminder — Do Not Edit Core Frappe / ERPNext Files</div>
+    All fixes should live in <code>health_sil/services/</code>, <code>health_sil/setup/</code>, or as Frappe <em>Custom DocPerm</em>, <em>Client Script</em>, or <em>Server Script</em> records. This ensures your changes survive <code>bench update</code> and can be tracked in git via fixture exports.
+  </div>
+</div>
+
+</body>
+</html>

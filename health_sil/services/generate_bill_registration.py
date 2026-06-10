@@ -231,7 +231,8 @@ def log_and_notify_payment_error(invoice_name, error):
             f"User: {frappe.session.user}\n"
             f"Roles: {', '.join(frappe.get_roles())}\n"
             f"Invoice: {invoice_name}\n"
-            f"Error: {str(error)}\n\n"
+            f"Error type: {type(error).__name__}\n"
+            f"Error: {repr(error)}\n\n"
             f"Traceback:\n{traceback.format_exc()}"
         ),
     )
@@ -245,7 +246,8 @@ def handle_errors(error, original_user=None):
         message=(
             f"User: {user}\n"
             f"Roles: {', '.join(frappe.get_roles(user))}\n"
-            f"Error: {str(error)}\n\n"
+            f"Error type: {type(error).__name__}\n"
+            f"Error: {repr(error)}\n\n"
             f"Traceback:\n{traceback.format_exc()}"
         ),
     )
