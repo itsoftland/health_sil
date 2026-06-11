@@ -59,7 +59,7 @@ def process_medicine_return(pharmacy_billing_name, return_items):
                     warehouse         = warehouse,
                     actual_qty        = ret_qty,          # positive = inward
                     company           = bill.company,
-                    voucher_type      = "Material Receipt",
+                    voucher_type      = "Pharmacy Billing",   # must be a real DocType in ERPNext v15
                     voucher_detail_no = pharmacy_billing_name,
                     remarks           = "Medicine return from bill {0}".format(pharmacy_billing_name),
                 )
@@ -152,6 +152,46 @@ def _get_default_warehouse(item_code):
     return wh
 
 
+def _create_serial_and_batch_bundle(item_code, batch_no, warehouse, qty, company, pharmacy_billing_name):
+    """
+    Create and submit a Serial and Batch Bundle for an inward (return) movement.
+
+    ERPNext v15 requires an SBB linked to every SLE for batch/serial items.
+    The SBB must be submitted before the SLE is inserted so the SLE's
+    validate() can find it.
+
+    voucher_type must be a real DocType (Link → DocType field).
+    In ERPNext v15, both the SBB and the SLE must use a real DocType.
+    We use "Pharmacy Billing" (the source bill) which IS a real DocType and
+    is already submitted, satisfying all SBB and SLE validations cleanly.
+    """
+    item_detail = frappe.get_cached_value(
+        "Item", item_code, ["has_batch_no", "has_serial_no"], as_dict=True
+    )
+    if not (item_detail.has_batch_no or item_detail.has_serial_no):
+        return None
+
+    sbb = frappe.get_doc({
+        "doctype":             "Serial and Batch Bundle",
+        "item_code":           item_code,
+        "warehouse":           warehouse,
+        "voucher_type":        "Pharmacy Billing",   # real DocType, already submitted
+        "voucher_no":          pharmacy_billing_name,
+        "type_of_transaction": "Inward",
+        "has_batch_no":        item_detail.has_batch_no,
+        "company":             company,
+        "entries": [{
+            "batch_no":  batch_no,
+            "qty":       qty,
+            "warehouse": warehouse,
+        }],
+    })
+    sbb.flags.ignore_permissions        = True
+    sbb.flags.ignore_voucher_validation = True   # skip docstatus check on voucher_no
+    sbb.submit()
+    return sbb.name
+
+
 def _create_stock_ledger_entry(
     item_code, batch_no, warehouse, actual_qty,
     company, voucher_type, voucher_detail_no, remarks=""
@@ -159,7 +199,7 @@ def _create_stock_ledger_entry(
     """
     Insert a Stock Ledger Entry for the returned stock (inward movement).
     actual_qty is POSITIVE (we are adding stock back).
-    
+
     Uses frappe.get_doc + insert so that all validation hooks run properly,
     including qty_after_transaction recalculation.
     """
@@ -186,42 +226,45 @@ def _create_stock_ledger_entry(
     prev_qty_after = flt(frappe.db.get_value("Batch", batch_no, "batch_qty") or 0)
     new_qty_after  = prev_qty_after + actual_qty
 
+    # ERPNext v15: SLE validation requires a submitted Serial and Batch Bundle
+    # for any item with has_batch_no or has_serial_no. Create it first.
+    # voucher_detail_no == pharmacy_billing_name in this flow.
+    sbb_name = _create_serial_and_batch_bundle(
+        item_code              = item_code,
+        batch_no               = batch_no,
+        warehouse              = warehouse,
+        qty                    = actual_qty,
+        company                = company,
+        pharmacy_billing_name  = voucher_detail_no,
+    )
+
     sle = frappe.get_doc({
-        "doctype":               "Stock Ledger Entry",
-        "item_code":             item_code,
-        "warehouse":             warehouse,
-        "posting_date":          posting_dt.date(),
-        "posting_time":          posting_dt.strftime("%H:%M:%S"),
-        "actual_qty":            actual_qty,             # positive = stock in
-        "qty_after_transaction": new_qty_after,
-        "batch_no":              batch_no or "",
-        "voucher_type":          voucher_type,
-        "voucher_no":            voucher_detail_no,
-        "voucher_detail_no":     voucher_detail_no,
-        "company":               company,
-        "is_cancelled":          0,
-        "remarks":               remarks or "Medicine return",
-        "incoming_rate":         0,                      # no valuation needed for return
-        "stock_uom":             frappe.get_cached_value("Item", item_code, "stock_uom") or "Nos",
+        "doctype":                  "Stock Ledger Entry",
+        "item_code":                item_code,
+        "warehouse":                warehouse,
+        "posting_date":             posting_dt.date(),
+        "posting_time":             posting_dt.strftime("%H:%M:%S"),
+        "actual_qty":               actual_qty,             # positive = stock in
+        "qty_after_transaction":    new_qty_after,
+        "batch_no":                 batch_no or "",
+        "serial_and_batch_bundle":  sbb_name or "",
+        "voucher_type":             voucher_type,
+        "voucher_no":               voucher_detail_no,
+        "voucher_detail_no":        voucher_detail_no,
+        "company":                  company,
+        "is_cancelled":             0,
+        "remarks":                  remarks or "Medicine return",
+        "incoming_rate":            0,                      # no valuation needed for return
+        "stock_uom":                frappe.get_cached_value("Item", item_code, "stock_uom") or "Nos",
     })
 
     sle.flags.ignore_permissions   = True
     sle.flags.ignore_links         = True
     sle.flags.ignore_validate_update_after_submit = True
     sle.insert(ignore_permissions=True)
+    sle.submit()
 
-    # Submit via the document API so on_submit hooks (including
-    # validate_serial_batch_no_bundle) run properly.
-    # We set ignore_serial_batch_bundle_validation because this SLE is a
-    # manual stock correction that does not have a Serial and Batch Bundle
-    # (Bug F fix — replaces the raw db.set_value('docstatus', 1) hack).
-    frappe.flags.ignore_serial_batch_bundle_validation = True
-    try:
-        sle.submit()
-    finally:
-        frappe.flags.ignore_serial_batch_bundle_validation = False
-
-    # NOTE: frappe.db.commit() intentionally removed from here (Bug F fix).
+    # NOTE: frappe.db.commit() intentionally removed from here.
     # The outer process_medicine_return() commits once after all items succeed,
     # so a mid-loop failure can roll back all earlier stock entries atomically.
 
@@ -250,3 +293,25 @@ def _sync_batch_qty(batch_no, ret_qty):
     current_qty = flt(frappe.db.get_value("Batch", batch_no, "batch_qty") or 0)
     new_qty     = current_qty + ret_qty
     frappe.db.set_value("Batch", batch_no, "batch_qty", new_qty, update_modified=False)
+
+
+@frappe.whitelist()
+def get_return_bill_html(pharmacy_billing_name, return_items):
+    """
+    Render the 'Pharmacy Return Bill' print format with the given return_items
+    injected into frappe.local.form_dict so the Jinja template can access them.
+    Returns the rendered HTML string.
+
+    Frappe's /printview strips custom URL parameters before calling get_print(),
+    so this API injects them server-side instead.
+    """
+    # Inject return_items into form_dict so Jinja's frappe.form_dict.get('return_items') works
+    frappe.local.form_dict.return_items = return_items
+
+    html = frappe.get_print(
+        doctype="Pharmacy Billing",
+        name=pharmacy_billing_name,
+        print_format="Pharmacy Return Bill",
+        no_letterhead=1,
+    )
+    return html

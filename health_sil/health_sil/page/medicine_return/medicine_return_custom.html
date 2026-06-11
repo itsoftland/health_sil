@@ -1,0 +1,304 @@
+<div class="mr-wrapper">
+
+  <!-- ── HEADER ─────────────────────────────────────── -->
+  <div class="mr-header">
+    <div class="mr-header-left">
+      <h1 class="mr-title">
+        <span class="mr-title-icon">↩️</span>
+        Medicine Return
+      </h1>
+      <p class="mr-subtitle">Search a pharmacy bill and process medicine returns</p>
+    </div>
+  </div>
+
+  <!-- ── MODE TABS ─────────────────────────────────── -->
+  <div class="mr-mode-tabs" id="mr-mode-tabs">
+    <button class="mr-tab active" data-mode="bill">
+      <span class="mr-tab-icon">🧾</span>
+      <span>By Bill ID</span>
+    </button>
+    <button class="mr-tab" data-mode="patient">
+      <span class="mr-tab-icon">👤</span>
+      <span>By Patient Name</span>
+    </button>
+    <button class="mr-tab mr-tab-walkin" data-mode="walkin">
+      <span class="mr-tab-icon">🚶</span>
+      <span>Walk-in Return</span>
+      <span class="mr-tab-badge">No Bill</span>
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       MODE 1 — SEARCH BY BILL ID
+  ══════════════════════════════════════════════════ -->
+  <div id="mr-mode-bill" class="mr-mode-section">
+    <div class="mr-section-title">Step 1 — Enter Bill ID</div>
+    <div class="mr-search-bar">
+      <div class="mr-input-group">
+        <label for="mr-bill-id">Pharmacy Bill No.</label>
+        <input
+          type="text"
+          id="mr-bill-id"
+          placeholder="e.g. PB-2025-00123"
+          autocomplete="off"
+        />
+      </div>
+      <button id="mr-search-btn" class="mr-btn mr-btn-primary">
+        <span>🔍</span> Fetch Bill
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       MODE 2 — SEARCH BY PATIENT NAME
+  ══════════════════════════════════════════════════ -->
+  <div id="mr-mode-patient" class="mr-mode-section" style="display:none;">
+    <div class="mr-section-title">Step 1 — Search by Patient Name</div>
+    <div class="mr-search-bar">
+      <div class="mr-input-group">
+        <label for="mr-patient-name">Patient Name</label>
+        <input
+          type="text"
+          id="mr-patient-name"
+          placeholder="Enter patient name to search bills…"
+          autocomplete="off"
+        />
+      </div>
+      <button id="mr-patient-search-btn" class="mr-btn mr-btn-primary">
+        <span>🔍</span> Search Bills
+      </button>
+    </div>
+
+    <!-- Patient Results List -->
+    <div id="mr-patient-results" class="mr-patient-results" style="display:none;">
+      <div class="mr-patient-results-title">
+        <span id="mr-patient-results-count">0</span> bill(s) found — click a row to load
+      </div>
+      <div id="mr-patient-results-list" class="mr-patient-results-list">
+        <!-- Injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       MODE 3 — WALK-IN RETURN (NO BILL)
+  ══════════════════════════════════════════════════ -->
+  <div id="mr-mode-walkin" class="mr-mode-section" style="display:none;">
+
+    <div class="mr-walkin-notice">
+      <span class="mr-walkin-notice-icon">ℹ️</span>
+      <div>
+        <strong>Walk-in Return</strong> — Use this when the customer has no bill and is not in the patient list.
+        Enter each medicine manually using its batch number. The refund is calculated at the
+        <strong>entered MRP × qty</strong> with <strong>no policy deduction</strong>.
+      </div>
+    </div>
+
+    <!-- ── Add Medicine Form ── -->
+    <div class="mr-section-title" style="margin-top:20px;">Add Medicine to Return</div>
+    <div class="mr-walkin-form" id="mr-walkin-form">
+      <div class="mr-walkin-fields">
+        <div class="mr-input-group">
+          <label for="wk-batch">Batch No. <span class="mr-required">*</span></label>
+          <input type="text" id="wk-batch" placeholder="e.g. BT-2024-001" autocomplete="off" />
+        </div>
+        <div class="mr-input-group">
+          <label for="wk-item-name">Medicine Name <span class="mr-required">*</span></label>
+          <input type="text" id="wk-item-name" placeholder="e.g. Paracetamol 500mg" autocomplete="off" />
+        </div>
+        <div class="mr-input-group mr-input-group-sm">
+          <label for="wk-qty">Qty <span class="mr-required">*</span></label>
+          <input type="number" id="wk-qty" min="1" placeholder="1" value="1" />
+        </div>
+        <div class="mr-input-group mr-input-group-sm">
+          <label for="wk-mrp">MRP (Sold Price ₹) <span class="mr-required">*</span></label>
+          <input type="number" id="wk-mrp" min="0" step="0.01" placeholder="0.00" />
+        </div>
+        <div class="mr-input-group mr-input-group-xs">
+          <label for="wk-disc">Disc %</label>
+          <input type="number" id="wk-disc" min="0" max="100" step="0.01" placeholder="0.00" value="0" />
+        </div>
+        <div class="mr-input-group mr-input-group-xs">
+          <label for="wk-gst">GST %</label>
+          <input type="number" id="wk-gst" min="0" max="28" step="0.01" placeholder="12" value="12" />
+        </div>
+        <div class="mr-input-group mr-input-group-xs">
+          <label for="wk-hsn">HSN</label>
+          <input type="text" id="wk-hsn" placeholder="30049099" autocomplete="off" />
+        </div>
+        <div class="mr-input-group mr-input-group-xs">
+          <label for="wk-expiry">Expiry</label>
+          <input type="text" id="wk-expiry" placeholder="MM-YYYY" autocomplete="off" />
+        </div>
+      </div>
+      <div class="mr-walkin-add-row">
+        <button id="mr-walkin-add-btn" class="mr-btn mr-btn-primary">
+          <span>➕</span> Add Medicine
+        </button>
+        <span class="mr-hint">Fill batch, name, qty and MRP — all other fields are optional.</span>
+      </div>
+    </div>
+
+    <!-- ── Walk-in Items Table ── -->
+    <div id="mr-walkin-table-wrap" class="mr-table-wrapper" style="display:none; margin-top:18px;">
+      <table class="mr-medicine-table" id="mr-walkin-table">
+        <thead>
+          <tr>
+            <th style="width:36px;">#</th>
+            <th>HSN</th>
+            <th>Medicine Name</th>
+            <th>Batch</th>
+            <th>Expiry</th>
+            <th style="width:70px;">Qty</th>
+            <th>MRP (Sold)</th>
+            <th>Disc%</th>
+            <th>GST%</th>
+            <th style="text-align:right;">Refund Amt</th>
+            <th style="width:40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="mr-walkin-tbody">
+          <!-- Injected by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Walk-in Summary -->
+    <div id="mr-walkin-summary" class="mr-summary" style="display:none; margin-top:14px;">
+      <div class="mr-summary-left">
+        <div class="mr-summary-stat">
+          <span class="mr-summary-label">Items</span>
+          <span class="mr-summary-value" id="wk-sum-items">0</span>
+        </div>
+        <div class="mr-summary-stat">
+          <span class="mr-summary-label">Total Qty</span>
+          <span class="mr-summary-value" id="wk-sum-qty">0</span>
+        </div>
+      </div>
+      <div class="mr-summary-right">
+        <div class="mr-return-total-label">Refund Amount <span class="mr-no-deduction-badge">No Deduction</span></div>
+        <div class="mr-return-total-value" id="wk-sum-total">₹ 0.00</div>
+      </div>
+    </div>
+
+    <!-- Walk-in Action Bar -->
+    <div class="mr-action-bar" id="mr-walkin-action-bar" style="display:none;">
+      <button id="mr-walkin-process-btn" class="mr-btn mr-btn-danger" disabled>
+        <span>↩</span> Process Walk-in Return &amp; Update Stock
+      </button>
+      <button id="mr-walkin-print-btn" class="mr-btn mr-btn-secondary" style="display:none;">
+        <span>🖨️</span> Print Return Bill
+      </button>
+      <button id="mr-walkin-clear-btn" class="mr-btn mr-btn-secondary">
+        <span>🗑️</span> Clear All
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       SHARED — BILL INFO CARD (shown after bill fetch)
+  ══════════════════════════════════════════════════ -->
+  <div id="mr-bill-info" class="mr-bill-info" style="display:none;">
+    <div class="mr-bill-info-row">
+      <div class="mr-info-item">
+        <span class="mr-info-label">Bill No.</span>
+        <span class="mr-info-value" id="mr-info-name">—</span>
+      </div>
+      <div class="mr-info-item">
+        <span class="mr-info-label">Patient</span>
+        <span class="mr-info-value" id="mr-info-patient">—</span>
+      </div>
+      <div class="mr-info-item">
+        <span class="mr-info-label">Date</span>
+        <span class="mr-info-value" id="mr-info-date">—</span>
+      </div>
+      <div class="mr-info-item">
+        <span class="mr-info-label">Doctor</span>
+        <span class="mr-info-value" id="mr-info-doctor">—</span>
+      </div>
+      <div class="mr-info-item">
+        <span class="mr-info-label">Grand Total</span>
+        <span class="mr-info-value mr-info-total" id="mr-info-total">—</span>
+      </div>
+      <div class="mr-info-item">
+        <span class="mr-badge mr-badge-submitted" id="mr-info-status">Submitted</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 2 : SELECT MEDICINES (Bill modes only) ── -->
+  <div id="mr-step2" style="display:none;">
+    <div class="mr-section-title" style="margin-top:28px;">
+      Step 2 — Select Medicines to Return
+    </div>
+
+    <div class="mr-table-wrapper">
+      <div class="mr-select-all-row">
+        <label class="mr-checkbox-label">
+          <input type="checkbox" id="mr-select-all" />
+          <span>Select All</span>
+        </label>
+        <span class="mr-hint">Check the medicines you wish to return. You can partial-return by editing qty.</span>
+      </div>
+
+      <table class="mr-medicine-table" id="mr-medicine-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">⬜</th>
+            <th>HSN</th>
+            <th>Product Name</th>
+            <th>Batch</th>
+            <th>Expiry</th>
+            <th style="width:90px;">Billed Qty</th>
+            <th style="width:100px;">Return Qty</th>
+            <th>MRP</th>
+            <th>Disc%</th>
+            <th>GST%</th>
+            <th style="text-align:right;">Amount</th>
+          </tr>
+        </thead>
+        <tbody id="mr-medicine-tbody">
+          <!-- Rows inserted by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── RETURN SUMMARY ── -->
+    <div id="mr-summary" class="mr-summary" style="display:none;">
+      <div class="mr-summary-left">
+        <div class="mr-summary-stat">
+          <span class="mr-summary-label">Items Returning</span>
+          <span class="mr-summary-value" id="mr-ret-items">0</span>
+        </div>
+        <div class="mr-summary-stat">
+          <span class="mr-summary-label">Total Qty</span>
+          <span class="mr-summary-value" id="mr-ret-qty">0</span>
+        </div>
+      </div>
+      <div class="mr-summary-right">
+        <div class="mr-return-total-label">Refund Amount</div>
+        <div class="mr-return-total-value" id="mr-ret-total">₹ 0.00</div>
+      </div>
+    </div>
+
+    <!-- ── ACTION BUTTONS ── -->
+    <div class="mr-action-bar" id="mr-action-bar" style="display:none;">
+      <button id="mr-process-btn" class="mr-btn mr-btn-danger">
+        <span>↩</span> Process Return &amp; Update Stock
+      </button>
+      <button id="mr-print-btn" class="mr-btn mr-btn-secondary" style="display:none;">
+        <span>🖨️</span> Print Return Bill
+      </button>
+    </div>
+  </div>
+
+  <!-- ── SPINNER ── -->
+  <div class="mr-spinner" id="mr-spinner" style="display:none;">
+    <div class="mr-spinner-circle"></div>
+    <span>Processing…</span>
+  </div>
+
+  <!-- ── RESULT BANNER ── -->
+  <div id="mr-result-banner" class="mr-result-banner" style="display:none;"></div>
+
+</div><!-- /mr-wrapper -->
