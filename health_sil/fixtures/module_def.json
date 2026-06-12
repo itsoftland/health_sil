@@ -4,21 +4,6 @@
   "_comments": null,
   "_liked_by": null,
   "_user_tags": null,
-  "app_name": "sil_v2",
-  "custom": 0,
-  "docstatus": 0,
-  "doctype": "Module Def",
-  "modified": "2025-05-28 10:56:39.122539",
-  "module_name": "Sil V2",
-  "name": "Sil V2",
-  "package": null,
-  "restrict_to_domain": null
- },
- {
-  "_assign": null,
-  "_comments": null,
-  "_liked_by": null,
-  "_user_tags": null,
   "app_name": "frappe",
   "custom": 0,
   "docstatus": 0,
@@ -671,6 +656,21 @@
   "modified": "2025-04-30 10:15:54.781665",
   "module_name": "Audit Trail",
   "name": "Audit Trail",
+  "package": null,
+  "restrict_to_domain": null
+ },
+ {
+  "_assign": null,
+  "_comments": null,
+  "_liked_by": null,
+  "_user_tags": null,
+  "app_name": "sil_v2",
+  "custom": 0,
+  "docstatus": 0,
+  "doctype": "Module Def",
+  "modified": "2026-06-11 15:44:59.758404",
+  "module_name": "Sil V2",
+  "name": "Sil V2",
   "package": null,
   "restrict_to_domain": null
  }

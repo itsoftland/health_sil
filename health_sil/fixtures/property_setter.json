@@ -1,6 +1,38 @@
 [
  {
   "default_value": null,
+  "doc_type": "Patient Encounter",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "naming_series",
+  "is_system_generated": 0,
+  "modified": "2026-06-10 15:21:02.148804",
+  "module": null,
+  "name": "Patient Encounter-naming_series-options",
+  "property": "options",
+  "property_type": "Text",
+  "row_name": null,
+  "value": "HLC-ENC-.YYYY.-"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Patient",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "naming_series",
+  "is_system_generated": 0,
+  "modified": "2026-06-10 15:21:02.906643",
+  "module": null,
+  "name": "Patient-naming_series-options",
+  "property": "options",
+  "property_type": "Text",
+  "row_name": null,
+  "value": "HLC-PAT-.YYYY.-"
+ },
+ {
+  "default_value": null,
   "doc_type": "Lab Test",
   "docstatus": 0,
   "doctype": "Property Setter",
