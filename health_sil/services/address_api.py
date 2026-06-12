@@ -1,6 +1,6 @@
 import frappe
 
-def create_address_from_patient(doc, method):0
+def create_address_from_patient(doc, method):
     """
     After a Patient is inserted, create a new Address document using the custom address fields.
     The dynamic link is added as a child record in the dynamic_links table.
@@ -43,6 +43,7 @@ def create_address_from_patient(doc, method):0
         address.city = doc.custom_city
         address.country = doc.custom_country
         address.address_type = "Personal"
+        address.is_your_company_address = 0
 
         # Only set state and pincode if they are provided (optional for foreign patients)
         if doc.get("custom_state"):
