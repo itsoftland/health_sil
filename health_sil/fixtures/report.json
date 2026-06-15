@@ -1,5 +1,54 @@
 [
  {
+  "add_total_row": 0,
+  "columns": [],
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Report",
+  "filters": [],
+  "is_standard": "Yes",
+  "javascript": null,
+  "json": null,
+  "letter_head": null,
+  "modified": "2025-11-19 15:25:58.567516",
+  "module": "GST India",
+  "name": "Bill of Entry Summary",
+  "prepared_report": 0,
+  "query": null,
+  "ref_doctype": "Bill of Entry",
+  "reference_report": null,
+  "report_name": "Bill of Entry Summary",
+  "report_script": null,
+  "report_type": "Script Report",
+  "roles": [
+   {
+    "parent": "Bill of Entry Summary",
+    "parentfield": "roles",
+    "parenttype": "Report",
+    "role": "Purchase User"
+   },
+   {
+    "parent": "Bill of Entry Summary",
+    "parentfield": "roles",
+    "parenttype": "Report",
+    "role": "Accounts User"
+   },
+   {
+    "parent": "Bill of Entry Summary",
+    "parentfield": "roles",
+    "parenttype": "Report",
+    "role": "Accounts Manager"
+   },
+   {
+    "parent": "Bill of Entry Summary",
+    "parentfield": "roles",
+    "parenttype": "Report",
+    "role": "Auditor"
+   }
+  ],
+  "timeout": 0
+ },
+ {
   "add_total_row": 1,
   "columns": [],
   "disabled": 0,
@@ -777,55 +826,6 @@
     "parentfield": "roles",
     "parenttype": "Report",
     "role": "Accounts User"
-   }
-  ],
-  "timeout": 0
- },
- {
-  "add_total_row": 0,
-  "columns": [],
-  "disabled": 0,
-  "docstatus": 0,
-  "doctype": "Report",
-  "filters": [],
-  "is_standard": "Yes",
-  "javascript": null,
-  "json": null,
-  "letter_head": null,
-  "modified": "2023-05-08 12:24:58.886166",
-  "module": "GST India",
-  "name": "Bill of Entry Summary",
-  "prepared_report": 0,
-  "query": null,
-  "ref_doctype": "Bill of Entry",
-  "reference_report": null,
-  "report_name": "Bill of Entry Summary",
-  "report_script": null,
-  "report_type": "Script Report",
-  "roles": [
-   {
-    "parent": "Bill of Entry Summary",
-    "parentfield": "roles",
-    "parenttype": "Report",
-    "role": "Purchase User"
-   },
-   {
-    "parent": "Bill of Entry Summary",
-    "parentfield": "roles",
-    "parenttype": "Report",
-    "role": "Accounts User"
-   },
-   {
-    "parent": "Bill of Entry Summary",
-    "parentfield": "roles",
-    "parenttype": "Report",
-    "role": "Accounts Manager"
-   },
-   {
-    "parent": "Bill of Entry Summary",
-    "parentfield": "roles",
-    "parenttype": "Report",
-    "role": "Auditor"
    }
   ],
   "timeout": 0
