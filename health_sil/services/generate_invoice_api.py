@@ -6,21 +6,30 @@ from frappe.utils import nowdate, flt
 
 
 @frappe.whitelist()
-def create_sales_invoice(patient, patient_name, doctor=None, items=None, mode_of_payment=None, price_list=None, discount_amount_cash=None, discount_amount_percentage=None):
+def create_sales_invoice(patient, patient_name=None, doctor=None, items=None, mode_of_payment=None, price_list=None, discount_amount_cash=None, discount_amount_percentage=None):
     """
     Creates a Sales Invoice and auto-generates Payment Entry.
-    Switches to Administrator for doc operations, then patches ownership
-    back to the actual user so the audit trail is preserved.
+
+    patient      : Patient document ID — OR, in the legacy call path from billing
+                   forms (Pharmacy/Lab/Clinical), the billing doc's own name.
+    patient_name : The actual Patient document ID when the caller is a billing
+                   form using the old client script (where patient = billing doc name).
+                   After the fixture update this becomes optional / ignored.
     """
     original_user = frappe.session.user
     try:
-        customer = get_validated_customer(patient_name)
+        # Resolve the real Patient document ID.
+        # Old billing-form JS passes: patient=<billing-doc-name>, patient_name=<patient-doc-id>
+        # New billing-form JS passes: patient=<patient-doc-id>,   patient_name=<patient-doc-id>
+        # Patient-form JS always passes patient=<patient-doc-id> correctly.
+        patient_id = _resolve_patient_id(patient, patient_name)
+        customer = get_validated_customer(patient_id)
 
         # Switch to Administrator to bypass all nested ERPNext permission checks
         frappe.set_user("Administrator")
 
         invoice = create_and_submit_invoice(
-            customer, patient, patient_name, doctor, items,
+            customer, patient_id, doctor, items,
             price_list, discount_amount_cash, discount_amount_percentage,
             original_user,
         )
@@ -36,12 +45,33 @@ def create_sales_invoice(patient, patient_name, doctor=None, items=None, mode_of
 # ----------
 # Helper Functions
 # ----------
-def get_validated_customer(patient_name):
-    """Get and validate customer"""
-    customer = frappe.get_cached_value("Patient", patient_name, "customer")
+def _resolve_patient_id(patient, patient_name):
+    """Return the correct Patient document ID from the two args the caller provides.
+
+    Billing-form client scripts (Pharmacy/Lab/Clinical) have historically passed:
+      patient      = the billing document's own name  (e.g. RDC/PB/26/00068)
+      patient_name = the Patient Link field value      (e.g. HLC-PAT-2026-00001)
+
+    After the fixture update they will pass:
+      patient      = the Patient Link field value
+      patient_name = same value (or omitted)
+
+    Rule: use `patient` if it is a valid Patient document; otherwise fall back to
+    `patient_name`.  This keeps both old and new call paths working.
+    """
+    if frappe.db.exists("Patient", patient):
+        return patient
+    if patient_name and frappe.db.exists("Patient", patient_name):
+        return patient_name
+    frappe.throw(_("Patient not found: {0}").format(patient))
+
+
+def get_validated_customer(patient):
+    """Get and validate customer linked to the given Patient document ID."""
+    customer = frappe.get_cached_value("Patient", patient, "customer")
 
     if not customer:
-        frappe.throw(_("No Customer linked to Patient {0}").format(patient_name))
+        frappe.throw(_("No Customer linked to Patient {0}").format(patient))
 
     if frappe.get_cached_value("Customer", customer, "disabled"):
         frappe.throw(_("Customer {0} is disabled").format(customer))
@@ -49,7 +79,7 @@ def get_validated_customer(patient_name):
     return customer
 
 
-def create_and_submit_invoice(customer, patient, patient_name, doctor, items, price_list, discount_amount_cash, discount_amount_percentage, original_user):
+def create_and_submit_invoice(customer, patient, doctor, items, price_list, discount_amount_cash, discount_amount_percentage, original_user):
     items = json.loads(items)
     invoice = frappe.new_doc("Sales Invoice")
 
@@ -59,10 +89,13 @@ def create_and_submit_invoice(customer, patient, patient_name, doctor, items, pr
         for row in prepared_items
     )
 
+    # Always derive the patient's display name from the Patient document.
+    actual_patient_name = frappe.get_cached_value("Patient", patient, "patient_name") or ""
+
     invoice.update({
         "customer": customer,
         "patient": patient,
-        "patient_name": patient_name,
+        "patient_name": actual_patient_name,
         "ref_practitioner": doctor,
         "selling_price_list": price_list or "Standard Selling",
         "due_date": nowdate(),
