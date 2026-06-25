@@ -288,19 +288,10 @@
                 }),
                 success: function(response) {
                     if (response.message === 'Logged In') {
-                        // Fetch the redirect URL based on user role
-                        $.ajax({
-                            type: 'GET',
-                            url: '/api/method/health_sil.services.api.get_login_redirect_url',
-                            success: function(res) {
-                                window.location.href = res.message || '/app';
-                            },
-                            error: function() {
-                                window.location.href = '/app'; // Fallback to home
-                            }
-                        });
+                        window.location.href = response.home_page || '/app';
                     } else {
                         errorMessage.text("Invalid response from server").show();
+                        btn.prop('disabled', false).text('Login');
                     }
                 },
                 error: function(xhr) {
@@ -311,19 +302,16 @@
                     } catch(e) {
                         console.error('Error parsing response:', e);
                     }
-                    
+
                     errorMessage.html(`
                         <i class="fas fa-exclamation-circle mr-2"></i>
                         ${errorText}
                     `).show();
-                    
-                    // Add error styling to inputs
+
                     $('#login_email, #login_password').addClass('is-invalid');
                     btn.prop('disabled', false).text('Login');
                 },
                 complete: function() {
-                    // Reset button state
-                    // btn.prop('disabled', false).text('Login');
                     $('#login_email, #login_password').removeClass('is-invalid');
                 }
             });

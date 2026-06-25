@@ -87,6 +87,8 @@ app_license = "mit"
 after_install = "health_sil.setup.setup_permissions.setup_custom_role_permissions"
 after_migrate = "health_sil.setup.setup_permissions.setup_custom_role_permissions"
 
+on_session_creation = ["health_sil.services.api.set_login_redirect"]
+
 # Uninstallation
 # ------------
 
@@ -331,4 +333,5 @@ fixtures = [
         "filters": [["document_type", "=", "Patient Encounter"]]
     },
     # {"dt": "User Permission"}
+    {"dt": "Lab Test Template"},
 ]

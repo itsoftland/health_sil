@@ -2,6 +2,17 @@
  {
   "docstatus": 0,
   "doctype": "Client Script",
+  "dt": "Patient",
+  "enabled": 1,
+  "modified": "2026-04-23 10:09:09.717838",
+  "module": null,
+  "name": "Patient State Autocorrect",
+  "script": "frappe.ui.form.on('Patient', {\n    custom_state: function(frm) {\n        fix_state_format(frm);\n    },\n    before_save: function(frm) {\n        fix_state_format(frm);\n    }\n});\n\nfunction fix_state_format(frm) {\n    let state = frm.doc.custom_state;\n    if (!state) return;\n\n    const valid_states = [\n        \"Andaman and Nicobar Islands\", \"Andhra Pradesh\", \"Arunachal Pradesh\",\n        \"Assam\", \"Bihar\", \"Chandigarh\", \"Chhattisgarh\",\n        \"Dadra and Nagar Haveli and Daman and Diu\", \"Delhi\", \"Goa\",\n        \"Gujarat\", \"Haryana\", \"Himachal Pradesh\", \"Jammu and Kashmir\",\n        \"Jharkhand\", \"Karnataka\", \"Kerala\", \"Ladakh\", \"Lakshadweep\",\n        \"Madhya Pradesh\", \"Maharashtra\", \"Manipur\", \"Meghalaya\",\n        \"Mizoram\", \"Nagaland\", \"Odisha\", \"Puducherry\", \"Punjab\",\n        \"Rajasthan\", \"Sikkim\", \"Tamil Nadu\", \"Telangana\", \"Tripura\",\n        \"Uttar Pradesh\", \"Uttarakhand\", \"West Bengal\"\n    ];\n\n    // Try to find a matching state (case-insensitive)\n    let matched = valid_states.find(s => s.toLowerCase() === state.trim().toLowerCase());\n\n    if (matched) {\n        // Auto-correct silently\n        frm.set_value('custom_state', matched);\n        frappe.show_alert({\n            message: `State auto-corrected to: <b>${matched}</b>`,\n            indicator: 'green'\n        }, 4);\n    } else {\n        // Show warning popup with valid options\n        frappe.msgprint({\n            title: '⚠️ Invalid State Format',\n            indicator: 'orange',\n            message: `\n                <p>You entered: <b>${state}</b></p>\n                <p>India Compliance requires the exact state name with proper capitalization.</p>\n                <p>Examples:</p>\n                <ul>\n                    <li>✅ <b>Kerala</b> — not <i>kerala</i> or <i>KERALA</i></li>\n                    <li>✅ <b>Tamil Nadu</b> — not <i>tamil nadu</i></li>\n                    <li>✅ <b>Uttar Pradesh</b> — not <i>uttar pradesh</i></li>\n                </ul>\n                <p>Please select your state from the dropdown or type it exactly as shown.</p>\n            `\n        });\n        frm.set_value('custom_state', '');\n    }\n}\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
   "dt": "Pharmacy Billing",
   "enabled": 0,
   "modified": "2026-03-27 10:59:43.810717",

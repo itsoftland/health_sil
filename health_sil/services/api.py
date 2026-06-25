@@ -37,3 +37,18 @@ def get_login_redirect_url():
         return "/app/daily-report"
     return "/app/home"
 
+
+def set_login_redirect(login_manager):
+    """
+    on_session_creation hook — overrides home_page in the login response
+    so the client can redirect without a second API call.
+    """
+    user = getattr(login_manager, "user", None)
+    if not user or user == "Guest":
+        return
+    roles = frappe.get_roles(user)
+    if "Dashboard_user" in roles:
+        frappe.local.response["home_page"] = "/app/daily-report"
+    else:
+        frappe.local.response["home_page"] = "/app/home"
+
