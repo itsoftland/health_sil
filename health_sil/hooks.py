@@ -153,7 +153,7 @@ doc_events = {
     "Patient": {
         "after_insert": "health_sil.services.address_api.create_address_from_patient",
         # "before_insert": "health_sil.services.naming.before_insert",  # Path to the method
-        "before_insert": "health_sil.services.naming.generate_custom_uid"
+        # "before_insert": "health_sil.services.naming.generate_custom_uid"  # Disabled: now handled by Server Script per site
     },
     "Item": {
         "after_insert": [
